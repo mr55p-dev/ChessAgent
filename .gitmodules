@@ -1,0 +1,3 @@
+[submodule "vendor/pgn-extract"]
+	path = vendor/pgn-extract
+	url = git@github.com:mr55p-dev/pgn-extract.git

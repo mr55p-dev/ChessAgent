@@ -158,7 +158,7 @@ def data_generator(
             "--evaluation",
             "--addfencastling",
             "--fencomments",
-            "-ttags"
+            "-ttags_900_1100"
         ],
         stdin=reader.stdout,
         bufsize=1024, # 1K

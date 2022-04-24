@@ -121,7 +121,7 @@ def bitboard_from_fen(fen_string: str) -> tf.Tensor:
 
     # Ply
     # ply = to_move + 2 * (int(fields[5]) - to_move)
-    return tf.convert_to_tensor(bitboard, dtype=tf.bool)
+    return tf.convert_to_tensor(bitboard, dtype=tf.bool, name="bitboard")
 
 # Batch dimension (handled by tf.data)
 # Chunk dimension (handled by me / tfdata (window size!))
@@ -184,32 +184,64 @@ def data_generator(
         linebuffer.append(line)
 
 def move_stream():
-    BUF_SIZE = 10
+    # BUF_SIZE = 100
     # SHUFFLE = True
 
     # Get stream of games
-    game_stream = data_generator(bracket=1)
+    # game_stream = data_generator(bracket=1)
     # Create a buffer of size B
-    gamebuf = []
+    # gamebuf = []
     seq_id = 0
-    n = 0
 
     # define shuffle here
     # shuffle = shuffle() if SHUFFLE else lambda x: x
 
     while True:
-        # Fill the buffer from the stream
-        gamebuf = [next(game_stream) for _ in range(BUF_SIZE)]
+        # # Fill the buffer from the stream
+        # gamebuf = [next(game_stream) for _ in range(BUF_SIZE)]
 
-        # Shuffle the buffer (?)
-        # shuffle(game_buffer)
+        # # Shuffle the buffer (?)
+        # # shuffle(game_buffer)
 
-        for game in gamebuf:
+        for game in data_generator(bracket=1):
             for _, fen, ev in game:
                 # Decode FEN
                 bitboard = bitboard_from_fen(fen)
-                evaluation = tf.convert_to_tensor(ev, dtype=tf.float64)
-                seq_id = tf.convert_to_tensor(seq_id, dtype=tf.uint32)
+                evaluation = tf.convert_to_tensor(ev, dtype=tf.float64, name="evaluation")
+                seq_id = tf.convert_to_tensor(seq_id, dtype=tf.uint32, name="sequence_id")
                 yield bitboard, evaluation, seq_id
             # Upadte the sequence id after each game
             seq_id += 1
+
+def create_tfdata_set(
+    n_items: int = 500,
+    batch_size: int = 4,
+    chunk_size: int = 3
+    ):
+    """
+    Returns a fully formed tf.data.Dataset instance
+    code based on https://stackoverflow.com/questions/55109817/batch-sequential-data-with-tf-data
+    """
+    T_output = (
+        tf.TensorSpec(shape=(8, 8, 12), dtype=tf.bool, name="bitboard"),
+        tf.TensorSpec(shape=(), dtype=tf.float64, name="evaluation"),
+        tf.TensorSpec(shape=(), dtype=tf.uint32, name="sequence_id")
+    )
+
+    window_to_nested_ds = lambda b, e, s: tf.data.Dataset.zip((b, e, s)).batch(chunk_size, drop_remainder=True)
+    drop_game_crossover = lambda b, e, s: tf.equal(tf.size(tf.unique(s)[0]), 1)
+    remove_seqid = lambda b, e, s: (b, e)
+
+    return tf.data.Dataset.from_generator(
+        move_stream,
+        output_signature=T_output
+    )\
+    .shuffle(buffer_size=1024)\
+    .take(512)\
+    .window(chunk_size, 1, stride=3, drop_remainder=True)\
+    .flat_map(window_to_nested_ds)\
+    .filter(drop_game_crossover)\
+    .map(remove_seqid)\
+    .batch(batch_size, drop_remainder=True)\
+    .cache()\
+    .prefetch(tf.data.AUTOTUNE)

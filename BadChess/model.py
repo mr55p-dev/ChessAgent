@@ -2,10 +2,11 @@ from time import time
 import tensorflow as tf
 from tensorflow import keras
 
+from BadChess.generator import create_tfdata_set
+
 def create_generator():
     i = keras.Input(8, 8, 12)
     l = keras.layers.Flatten()(i)
-    l = keras.layers.Dense(200)(l)
     l = keras.layers.Dense(200)(l)
     l = keras.layers.Dense(200)(l)
     o = keras.layers.Dense(1)(l)
@@ -39,23 +40,19 @@ D = create_discriminator()
 G_rmse = tf.keras.metrics.RootMeanSquaredError()
 D_accuracy = tf.keras.metrics.Accuracy()
 
-def train_step(batch_G, batch_D):
-    # Get a batch B_0 from the dataset
-    batch_G_feat = batch_G(...)
-    batch_G_label = batch_G(...)
-
-    # Get another batch B_1 from the dataset
-    batch_D_la = batch_D(...)
+def train_step(batch_G, batch_D_eval):
+    # Split batch_G into feature and label
+    batch_G_bitboard, batch_G_eval = batch_G
 
     with tf.GradientTape() as G_tape, tf.GradientTape() as D_tape:
         # Propagate B_0 through G to get E_pred
-        Eval_pred = G(batch_G_feat)
+        G_pred_eval = G(batch_G_bitboard, training=True)
 
         # Propagate E_pred through D to get T_pred_0
-        truth_pred_fake = D(Eval_pred)
+        truth_pred_fake = D(G_pred_eval, training=True)
 
         # Propagate B_1 through D to get T_pred_1
-        truth_pred_real = D(batch_D_la)
+        truth_pred_real = D(batch_D_eval, training=True)
 
         # Use T_pred_0 and T_pred_1 to calculate (through BCE) L_D
         loss_D = loss_func_D(truth_pred_real, truth_pred_fake)
@@ -64,12 +61,12 @@ def train_step(batch_G, batch_D):
         loss_G_extrinsic = loss_func_G(truth_pred_fake)
 
         # Calculate the MAE on E vs E_pred, L_G_I
-        loss_G_intrinsic = mae(Eval_pred, batch_G_label)
+        loss_G_intrinsic = mae(G_pred_eval, batch_G_eval)
 
         # Calculate L_G = L_G_I + L_G_E
         loss_G = tf.add(loss_G_intrinsic, tf.multiply(1, loss_G_extrinsic))
 
-    G_rmse.update_state(Eval_pred, batch_G_label)
+    G_rmse.update_state(G_pred_eval, batch_G_eval)
     D_accuracy.update_state(truth_pred_real, 1)
     D_accuracy.update_state(truth_pred_fake, 0)
 
@@ -83,12 +80,18 @@ def train_step(batch_G, batch_D):
 
 def train():
     N_epochs = 10
-    dataset = ...
-    for epoch in range(N_epochs):
+    batch_size = 10
+    chunk_size = 3
+
+    train_dataset_G = create_tfdata_set(batch_size=batch_size, chunk_size=chunk_size)
+    train_dataset_D = create_tfdata_set(batch_size=batch_size, chunk_size=chunk_size)
+    ds_iter = zip(train_dataset_G, train_dataset_D)
+
+    for epoch in N_epochs:
         print(f"Epoch {epoch} - ", end="")
         start = time()
 
-        for batch_G, batch_D in dataset:
+        for (batch_G, (_, batch_D)) in ds_iter:
             train_step(batch_G, batch_D)
 
         dt = time() - start

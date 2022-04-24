@@ -1,4 +1,5 @@
-from BadChess.generator import bitboard_from_fen, data_generator, move_stream
+import chunk
+from BadChess.generator import bitboard_from_fen, create_tfdata_set, data_generator, move_stream
 import numpy as np
 import tensorflow as tf
 
@@ -50,8 +51,8 @@ def test_fen_decoder():
     white_pawns_init[1, :] = np.ones_like(white_pawns_init[1, :])
     assert (bitboard[:, :, 5] == white_pawns_init).all()
 
-def test_generator():
-    n_items = 5
+def test_move_stream():
+    n_items = 200
     gen = move_stream()
     prev_seqid = 0
     count = 0
@@ -63,4 +64,19 @@ def test_generator():
         prev_seqid = seqid
         count += 1
     assert count == n_items
+    assert prev_seqid > 0
+
+def test_tfdata():
+    batch_size = 100
+    chunk_size = 3
+    board_shape = (8, 8, 12)
+
+    dataset = create_tfdata_set(
+        batch_size=batch_size,
+        chunk_size=chunk_size
+    )
+    for item in iter(dataset.take(10)):
+        board, ev = item
+        assert board.shape == (batch_size, chunk_size, *board_shape)
+        assert ev.shape == (batch_size, chunk_size)
 

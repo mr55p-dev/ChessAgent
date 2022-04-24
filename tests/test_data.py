@@ -1,7 +1,10 @@
 import chunk
+import itertools
 from BadChess.generator import bitboard_from_fen, create_tfdata_set, data_generator, move_stream
 import numpy as np
 import tensorflow as tf
+
+from BadChess.model import train
 
 def typecheck(move_row):
     ply, fen, eva = move_row
@@ -60,7 +63,7 @@ def test_move_stream():
         board, eval, seqid = next(gen)
         assert board.shape == (8, 8, 12)
         assert seqid >= prev_seqid
-        assert eval.dtype == tf.float64
+        assert eval.dtype == tf.float32
         prev_seqid = seqid
         count += 1
     assert count == n_items
@@ -75,8 +78,21 @@ def test_tfdata():
         batch_size=batch_size,
         chunk_size=chunk_size
     )
+    item = next(iter(dataset))
+    assert item is not None
+
     for item in iter(dataset.take(10)):
         board, ev = item
         assert board.shape == (batch_size, chunk_size, *board_shape)
-        assert ev.shape == (batch_size, chunk_size)
+        assert ev.shape == (batch_size, chunk_size, 1)
 
+def test_integration():
+    N_epochs = 5
+    batch_size = 10
+    chunk_size = 3
+
+    train_dataset_G = create_tfdata_set(n_items=1000, batch_size=batch_size, chunk_size=chunk_size)
+    for _, batch_g in itertools.product(range(N_epochs), iter(train_dataset_G)):
+        batch_bb, batch_ev = batch_g
+        assert batch_bb.shape == (batch_size, chunk_size, 8, 8, 12)
+        assert batch_ev.shape == (batch_size, chunk_size, 1)

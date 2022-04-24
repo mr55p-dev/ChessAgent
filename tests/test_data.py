@@ -1,4 +1,4 @@
-from BadChess.generator import bitboard_from_fen, data_generator, data_fetcher, move_stream
+from BadChess.generator import bitboard_from_fen, data_generator, move_stream
 import numpy as np
 import tensorflow as tf
 
@@ -8,25 +8,28 @@ def typecheck(move_row):
     assert type(fen) == str
     assert type(eva) == float
 
-def test_raw_enerator():
-    gen = data_generator()
+def test_raw_generator():
+    gen = data_generator(1)
     for _ in range(10):
         moves = next(gen)
         [typecheck(i) for i in moves]
 
-def test_fetcher():
-    fetch = data_fetcher(5)
-    white, black = next(fetch)
-    assert len(white) == 3
-    assert len(black) == 2
-
-    ply = lambda x: x[0]
-    assert ply(white[1]) == ply(white[0]) + 2
-
-    for i in white:
-        typecheck(i)
-    for j in black:
-        typecheck(j)
+def test_raw_fen_whitespace():
+    """
+    Check to make sure that pgn-extract has been compiled
+    with leading/trailing line whitespace enabled, otherwise
+    separating the fen strings is HARD as you run into situations
+    where 'w' or 'b' are appended to the end of a string without
+    the proper whitespace, making decoding the string reliably
+    impossible
+    """
+    gen = data_generator(1)
+    for _ in range(1000):
+        moves = next(gen)
+        for _, fen, _ in moves:
+            sp = fen.split(' ')
+            if sp[0][-1] in {'w'}:
+                raise ValueError("Still wrong")
 
 
 def test_fen_decoder():
@@ -60,21 +63,4 @@ def test_generator():
         prev_seqid = seqid
         count += 1
     assert count == n_items
-
-def test_fen_whitespace():
-    """
-    Check to make sure that pgn-extract has been compiled
-    with leading/trailing line whitespace enabled, otherwise
-    separating the fen strings is HARD as you run into situations
-    where 'w' or 'b' are appended to the end of a string without
-    the proper whitespace, making decoding the string reliably
-    impossible
-    """
-    gen = data_generator()
-    for _ in range(1000):
-        moves = next(gen)
-        for _, fen, _ in moves:
-            sp = fen.split(' ')
-            if sp[0][-1] in {'w'}:
-                raise ValueError("Still wrong")
 

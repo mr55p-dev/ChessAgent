@@ -132,16 +132,19 @@ def data_generator(
     # cached: bool = True,
     # buf_size: int = 1,
     # shuffled: bool = True,
-    file: Path = Path("data/lichess_db_standard_rated_2018-04.pgn.bz2")
+    bracket: int,
+    file: Path = Path("data/lichess_db_standard_rated_2018-04.pgn.bz2"),
     ):
     """
     Generator function which yields whole games from the specified bz2 archive
 
     args:
+        int (1|2) bracket - using 1k (1) or 2k (2) elo games
         Path|str file - path to the bz2 archive to read from
     returns:
         generator[(ply: int, fen: str, evaluation: float)]
     """
+    tagfile = "tags_900_1100" if bracket == 1 else "tags_1900_2100"
     # Start reading from the bz2 archive
     reader = subprocess.Popen(
         ["bzcat", str(file)], # Opens and sequentially reads the contents of a bz2 archive
@@ -158,7 +161,7 @@ def data_generator(
             "--evaluation",
             "--addfencastling",
             "--fencomments",
-            "-ttags_900_1100"
+            f"-t{tagfile}"
         ],
         stdin=reader.stdout,
         bufsize=1024, # 1K
@@ -185,7 +188,7 @@ def move_stream():
     # SHUFFLE = True
 
     # Get stream of games
-    game_stream = data_generator()
+    game_stream = data_generator(bracket=1)
     # Create a buffer of size B
     gamebuf = []
     seq_id = 0

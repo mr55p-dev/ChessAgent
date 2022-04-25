@@ -4,8 +4,6 @@ from BadChess.generator import bitboard_from_fen, create_tfdata_set, data_genera
 import numpy as np
 import tensorflow as tf
 
-from BadChess.model import train
-
 def typecheck(move_row):
     ply, fen, eva = move_row
     assert type(ply) == int

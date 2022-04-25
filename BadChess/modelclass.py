@@ -124,28 +124,37 @@ class BaseGAN():
         # Populate with typical keras callbacks
         _callbacks = []
 
+        # Note that we cannot use history callback without specifying the model
+        # could be easy to create a quick subclass of history
         callbacks = tf.keras.callbacks.CallbackList(
             _callbacks,
-            add_history=True,
+            # add_history=True,
             add_progbar=True,
-            model=self.generator
+            # model=self.generator
         )
 
         logs = {}
         callbacks.on_train_begin(logs=logs)
 
         for epoch in range(n_epochs):
-
+            callbacks.on_epoch_begin(epoch)
             training_batches = zip(ds_train_generator, ds_train_discriminator)
 
             for step, (batch_G, (_, batch_D)) in enumerate(training_batches):
+                callbacks.on_batch_begin(step)
+                callbacks.on_train_batch_begin(step)
+
                 loss_G, loss_D = self._trainstep(batch_G, batch_D)
 
-            print(epoch)
+                callbacks.on_batch_end(step)
+                callbacks.on_train_batch_end(step)
+
+            callbacks.on_epoch_end(epoch)
 
             # Reset the metrics
             # G_rmse.reset_states()
             # D_accuracy.reset_states()
+        callbacks.on_train_end()
 
 mse = tf.keras.losses.MeanSquaredError()
 bce = tf.keras.losses.BinaryCrossentropy()

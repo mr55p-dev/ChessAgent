@@ -3,6 +3,7 @@ from typing import Iterable, List, Tuple
 import tensorflow as tf
 from tensorflow import keras
 from tqdm import trange
+from BadChess.metrics import Metric
 
 
 T_model = keras.models.Model
@@ -20,6 +21,9 @@ class BaseGAN():
         self.G_opt: T_opt = tf.keras.optimizers.Adam()
         self.D_opt: T_opt = tf.keras.optimizers.Adam()
         self.cblist: T_cblist
+
+        self.M_gen_loss = Metric()
+        self.M_dis_loss = Metric()
 
     @abstractmethod
     def create_generator(self) -> T_model:
@@ -92,6 +96,9 @@ class BaseGAN():
                 )
             )
 
+        self.M_gen_loss.update(loss_G)
+        self.M_dis_loss.update(loss_D)
+
         # G_rmse.update_state(G_pred_eval, batch_G_eval)
         # D_accuracy.update_state(tf.clip_by_value(tf.round(D_pred_real), 0, 1), tf.ones_like(D_pred_real))
         # D_accuracy.update_state(D_pred_fake, tf.zeros_like(D_pred_fake))
@@ -103,8 +110,6 @@ class BaseGAN():
         # Apply gradient updates to G, D
         self.G_opt.apply_gradients(zip(dL_G, self.generator.trainable_weights))
         self.D_opt.apply_gradients(zip(dL_D, self.discriminator.trainable_weights))
-
-        return loss_G, loss_D
 
     def train(
         self,
@@ -144,11 +149,13 @@ class BaseGAN():
                 callbacks.on_batch_begin(step)
                 callbacks.on_train_batch_begin(step)
 
-                loss_G, loss_D = self._trainstep(batch_G, batch_D)
+                self._trainstep(batch_G, batch_D)
 
                 callbacks.on_batch_end(step)
                 callbacks.on_train_batch_end(step)
 
+            self.M_gen_loss.reset()
+            self.M_dis_loss.reset()
             callbacks.on_epoch_end(epoch)
 
             # Reset the metrics

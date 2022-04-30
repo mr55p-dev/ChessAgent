@@ -1,17 +1,14 @@
-class Metric():
-    def __init__(self):
-        self._values = []
+import tensorflow as tf
 
-    def _calculate_metric(self) -> float:
-        return sum(self._values) / len(self._values) if self._values else 0
+class Loss(tf.keras.metrics.Metric):
+    def __init__(self, name="loss", **kwargs) -> None:
+        super().__init__(name=name, **kwargs)
+        self.loss = self.add_weight(name="loss_node", initializer='zeros')
+        self.counter = self.add_weight(name="n_steps", initializer='zeros')
 
-    def update(self, current_value) -> None:
-        self._values.append(current_value)
+    def update_state(self, new_loss):
+        self.loss.assign_add(tf.cast(new_loss, self.dtype))
+        self.counter.assign_add(tf.cast(1, self.dtype))
 
-    def read(self) -> float:
-        return self._calculate_metric()
-
-    def reset(self) -> float:
-        val = self.read()
-        self._values = []
-        return val
+    def result(self):
+        return tf.divide(self.loss, self.counter)

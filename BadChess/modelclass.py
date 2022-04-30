@@ -4,7 +4,7 @@ from typing import Iterable, List, Tuple
 import tensorflow as tf
 from tensorflow import keras
 from tqdm import trange
-from BadChess.metrics import Metric
+from BadChess.metrics import Loss
 
 
 T_model = keras.models.Model
@@ -25,6 +25,8 @@ class BaseGAN():
 
         self.M_gen_rmse = tf.keras.metrics.MeanSquaredError()
         self.M_dis_accuracy = tf.keras.metrics.Accuracy()
+        self.M_gen_loss = Loss(name="gen_loss")
+        self.M_dis_loss = Loss(name="dis_loss")
 
     @abstractmethod
     def create_generator(self) -> T_model:
@@ -100,6 +102,8 @@ class BaseGAN():
         self.M_gen_rmse.update_state(G_pred_eval, batch_G_eval)
         self.M_dis_accuracy.update_state(tf.clip_by_value(tf.round(D_pred_real), 0, 1), tf.ones_like(D_pred_real))
         self.M_dis_accuracy.update_state(D_pred_fake, tf.zeros_like(D_pred_fake))
+        self.M_gen_loss.update_state(loss_G)
+        self.M_dis_loss.update_state(loss_D)
 
         # Calculate DL_G, DL_D
         dL_G = G_tape.gradient(loss_G, self.generator.trainable_weights)
@@ -109,12 +113,10 @@ class BaseGAN():
         self.G_opt.apply_gradients(zip(dL_G, self.generator.trainable_weights))
         self.D_opt.apply_gradients(zip(dL_D, self.discriminator.trainable_weights))
 
-        return (loss_G, loss_D)
-
     def get_progbar_values(self):
         return [
-                ("Gen loss", self.loss_G),
-                ("Dis loss", self.loss_D),
+                ("Gen loss", self.M_gen_loss.result()),
+                ("Dis loss", self.M_dis_loss.result()),
                 ("Gen RMSE", self.M_gen_rmse.result()),
                 ("Dis accuracy", self.M_dis_accuracy.result())
             ]
@@ -149,38 +151,28 @@ class BaseGAN():
         ]
 
         target_steps = None # ds_train.cardinality
-        for _ in range(n_epochs):
-            progbar = tf.keras.utils.Progbar(
-                target=target_steps,
-            )
-            # callbacks.on_epoch_begin(epoch)
-            training_batches = zip(ds_train_generator, ds_train_discriminator)
+        for epoch in range(n_epochs):
+            # Reset the metrics
+            self.M_gen_loss.reset_states()
+            self.M_gen_rmse.reset_states()
 
-            for step, (batch_G, batch_D) in enumerate(training_batches):
-                # callbacks.on_batch_begin(step)
-                # callbacks.on_train_batch_begin(step)
+            self.M_dis_loss.reset_states()
+            self.M_dis_accuracy.reset_states()
 
-                self.loss_G, self.loss_D = self._trainstep(batch_G, batch_D)
+            # Display the current epoch and instantiat the progress bar
+            print(f"Epoch {epoch+1}")
+            progbar = tf.keras.utils.Progbar(target=target_steps)
+
+            # Zip the training data and enumerate it (batchwise)
+            for step, (batch_G, batch_D) in enumerate(zip(ds_train_generator, ds_train_discriminator)):
+
+                # Perform the training step
+                self._trainstep(batch_G, batch_D)
                 progbar.update(
                     step,
                     self.get_progbar_values()
                 )
-                self.M_gen_rmse.reset_state()
-                self.M_dis_accuracy.reset_state()
 
-                # callbacks.on_batch_end(step)
-                # callbacks.on_train_batch_end(step)
-
-            # callbacks.on_epoch_end(epoch)
-
-            # Reset the metrics
-            progbar.update(
-                step,
-                self.get_progbar_values(),
-                finalize=True
-            )
-            self.M_gen_rmse.reset_states()
-            self.M_dis_accuracy.reset_states()
             # Set the number of steps if it is unknown
             if not target_steps:
                 target_steps = step

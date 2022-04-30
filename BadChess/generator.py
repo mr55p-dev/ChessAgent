@@ -15,6 +15,14 @@ PLEASE DEAR GOD DONT FORGET TO OFFSET THE LABELS LOL
 """
 
 T_match_row = Tuple[int, str, float]
+T_tfdata_output = (
+    tf.TensorSpec(shape=(1,), dtype=tf.float32, name="evaluation"),
+    tf.TensorSpec(shape=(), dtype=tf.uint32, name="sequence_id")
+)
+T_tfdata_output_bitboard = (
+    tf.TensorSpec(shape=(8, 8, 12), dtype=tf.float32, name="bitboard"),
+    *T_tfdata_output
+)
 
 def process_match(match: re.Match) -> T_match_row:
     turn, player, move, clock_raw, eval_raw, fen_raw = match.groups()
@@ -215,35 +223,55 @@ def move_stream():
             # Upadte the sequence id after each game
             seq_id += 1
 
+def move_stream_no_bitboard():
+    seq_id = 0
+    while True:
+        for game in data_generator(bracket=1):
+            for _, _, ev in game:
+                # Decode FEN
+                evaluation = tf.reshape(
+                    tf.convert_to_tensor(ev, dtype=tf.float32, name="evaluation"), (1,)
+                )
+                seq_id = tf.convert_to_tensor(seq_id, dtype=tf.uint32, name="sequence_id")
+                yield evaluation, seq_id
+            # Upadte the sequence id after each game
+            seq_id += 1
+
 def create_tfdata_set(
     n_items: int = 512,
     shuffle_bufsize: int = 0,
     batch_size: int = 4,
-    chunk_size: int = 3
+    chunk_size: int = 3,
+    use_bitboard: bool = True,
+    skip: int = 0
     ):
     """
     Returns a fully formed tf.data.Dataset instance
     code based on https://stackoverflow.com/questions/55109817/batch-sequential-data-with-tf-data
     """
-    T_output = (
-        tf.TensorSpec(shape=(8, 8, 12), dtype=tf.float32, name="bitboard"),
-        tf.TensorSpec(shape=(1,), dtype=tf.float32, name="evaluation"),
-        tf.TensorSpec(shape=(), dtype=tf.uint32, name="sequence_id")
-    )
-
-    window_to_nested_ds = lambda b, e, s: tf.data.Dataset.zip((b, e, s)).batch(chunk_size, drop_remainder=True)
-    drop_game_crossover = lambda b, e, s: tf.equal(tf.size(tf.unique(s)[0]), 1)
-    remove_seqid = lambda b, e, s: (b, e)
-
-    return tf.data.Dataset.from_generator(
-        move_stream,
-        output_signature=T_output
-    )\
-    .take(n_items)\
-    .window(chunk_size, 1, stride=3, drop_remainder=True)\
-    .flat_map(window_to_nested_ds)\
-    .filter(drop_game_crossover)\
-    .map(remove_seqid)\
-    .batch(batch_size, drop_remainder=True)\
-    .cache()\
-    .prefetch(tf.data.AUTOTUNE)
+    if use_bitboard:
+        window_to_nested_ds = lambda b, e, s: tf.data.Dataset.zip((b, e, s)).batch(chunk_size, drop_remainder=True)
+        drop_game_crossover = lambda b, e, s: tf.equal(tf.size(tf.unique(s)[0]), 1)
+        remove_seqid = lambda b, e, s: (b, e)
+        ds = tf.data.Dataset.from_generator(
+            move_stream,
+            output_signature=T_tfdata_output_bitboard
+        )
+    else:
+        window_to_nested_ds = lambda e, s: tf.data.Dataset.zip((e, s)).batch(chunk_size, drop_remainder=True)
+        drop_game_crossover = lambda e, s: tf.equal(tf.size(tf.unique(s)[0]), 1)
+        remove_seqid = lambda e, s: e
+        ds = tf.data.Dataset.from_generator(
+            move_stream_no_bitboard,
+            output_signature=T_tfdata_output
+        )
+    if skip:
+        ds = ds.skip(skip)
+    ds = ds.take(n_items)
+    ds = ds.window(chunk_size, 1, stride=3, drop_remainder=True)
+    ds = ds.flat_map(window_to_nested_ds)
+    ds = ds.filter(drop_game_crossover)
+    ds = ds.map(remove_seqid)
+    ds = ds.batch(batch_size, drop_remainder=True)
+    ds = ds.cache()
+    return ds.prefetch(tf.data.AUTOTUNE)

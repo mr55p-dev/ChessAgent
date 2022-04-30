@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from readline import add_history
 from typing import Iterable, List, Tuple
 import tensorflow as tf
 from tensorflow import keras
@@ -22,8 +23,8 @@ class BaseGAN():
         self.D_opt: T_opt = tf.keras.optimizers.Adam()
         self.cblist: T_cblist
 
-        self.M_gen_loss = Metric()
-        self.M_dis_loss = Metric()
+        self.M_gen_rmse = tf.keras.metrics.MeanSquaredError()
+        self.M_dis_accuracy = tf.keras.metrics.Accuracy()
 
     @abstractmethod
     def create_generator(self) -> T_model:
@@ -96,12 +97,9 @@ class BaseGAN():
                 )
             )
 
-        self.M_gen_loss.update(loss_G)
-        self.M_dis_loss.update(loss_D)
-
-        # G_rmse.update_state(G_pred_eval, batch_G_eval)
-        # D_accuracy.update_state(tf.clip_by_value(tf.round(D_pred_real), 0, 1), tf.ones_like(D_pred_real))
-        # D_accuracy.update_state(D_pred_fake, tf.zeros_like(D_pred_fake))
+        self.M_gen_rmse.update_state(G_pred_eval, batch_G_eval)
+        self.M_dis_accuracy.update_state(tf.clip_by_value(tf.round(D_pred_real), 0, 1), tf.ones_like(D_pred_real))
+        self.M_dis_accuracy.update_state(D_pred_fake, tf.zeros_like(D_pred_fake))
 
         # Calculate DL_G, DL_D
         dL_G = G_tape.gradient(loss_G, self.generator.trainable_weights)
@@ -110,6 +108,16 @@ class BaseGAN():
         # Apply gradient updates to G, D
         self.G_opt.apply_gradients(zip(dL_G, self.generator.trainable_weights))
         self.D_opt.apply_gradients(zip(dL_D, self.discriminator.trainable_weights))
+
+        return (loss_G, loss_D)
+
+    def get_progbar_values(self):
+        return [
+                ("Gen loss", self.loss_G),
+                ("Dis loss", self.loss_D),
+                ("Gen RMSE", self.M_gen_rmse.result()),
+                ("Dis accuracy", self.M_dis_accuracy.result())
+            ]
 
     def train(
         self,
@@ -126,42 +134,57 @@ class BaseGAN():
         self.chunk_size = 1
         self.n_items = 5000
 
+        # Histories
+        G_hist = tf.keras.callbacks.History()
+        D_hist = tf.keras.callbacks.History()
+
+        G_hist.set_model(self.generator)
+        D_hist.set_model(self.discriminator)
+
+
         # Populate with typical keras callbacks
-        _callbacks = []
+        _callbacks = [
+            G_hist,
+            D_hist
+        ]
 
-        # Note that we cannot use history callback without specifying the model
-        # could be easy to create a quick subclass of history
-        callbacks = tf.keras.callbacks.CallbackList(
-            _callbacks,
-            # add_history=True,
-            add_progbar=True,
-            # model=self.generator
-        )
-
-        logs = {}
-        callbacks.on_train_begin(logs=logs)
-
-        for epoch in range(n_epochs):
-            callbacks.on_epoch_begin(epoch)
+        target_steps = None # ds_train.cardinality
+        for _ in range(n_epochs):
+            progbar = tf.keras.utils.Progbar(
+                target=target_steps,
+            )
+            # callbacks.on_epoch_begin(epoch)
             training_batches = zip(ds_train_generator, ds_train_discriminator)
 
-            for step, (batch_G, (_, batch_D)) in enumerate(training_batches):
-                callbacks.on_batch_begin(step)
-                callbacks.on_train_batch_begin(step)
+            for step, (batch_G, batch_D) in enumerate(training_batches):
+                # callbacks.on_batch_begin(step)
+                # callbacks.on_train_batch_begin(step)
 
-                self._trainstep(batch_G, batch_D)
+                self.loss_G, self.loss_D = self._trainstep(batch_G, batch_D)
+                progbar.update(
+                    step,
+                    self.get_progbar_values()
+                )
+                self.M_gen_rmse.reset_state()
+                self.M_dis_accuracy.reset_state()
 
-                callbacks.on_batch_end(step)
-                callbacks.on_train_batch_end(step)
+                # callbacks.on_batch_end(step)
+                # callbacks.on_train_batch_end(step)
 
-            self.M_gen_loss.reset()
-            self.M_dis_loss.reset()
-            callbacks.on_epoch_end(epoch)
+            # callbacks.on_epoch_end(epoch)
 
             # Reset the metrics
-            # G_rmse.reset_states()
-            # D_accuracy.reset_states()
-        callbacks.on_train_end()
+            progbar.update(
+                step,
+                self.get_progbar_values(),
+                finalize=True
+            )
+            self.M_gen_rmse.reset_states()
+            self.M_dis_accuracy.reset_states()
+            # Set the number of steps if it is unknown
+            if not target_steps:
+                target_steps = step
+        # callbacks.on_train_end()
 
 mse = tf.keras.losses.MeanSquaredError()
 bce = tf.keras.losses.BinaryCrossentropy()

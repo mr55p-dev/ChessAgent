@@ -8,8 +8,10 @@ class Metric():
     def update(self, current_value) -> None:
         self._values.append(current_value)
 
-    def read(self):
+    def read(self) -> float:
         return self._calculate_metric()
 
-    def reset(self):
+    def reset(self) -> float:
+        val = self.read()
         self._values = []
+        return val

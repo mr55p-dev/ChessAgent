@@ -1,4 +1,3 @@
-
 import re
 import subprocess
 from pathlib import Path
@@ -8,12 +7,8 @@ from typing import Tuple
 import numpy as np
 import tensorflow as tf
 
-"""This entire file should be in C++ ideally"""
 
-"""
-PLEASE DEAR GOD DONT FORGET TO OFFSET THE LABELS LOL
-"""
-
+# Define some common types
 T_match_row = Tuple[int, str, float]
 T_tfdata_output = (
     tf.TensorSpec(shape=(1,), dtype=tf.float32, name="evaluation"),
@@ -24,7 +19,41 @@ T_tfdata_output_bitboard = (
     *T_tfdata_output
 )
 
+
+"""Create the stream of games at the module level, to ensure that data isnt shared or that the file isn't opened lots of times"""
+# Select the tags (PGN filtering rules) to use
+tagfiles = ["tags_900_1100", "tags_1900_2100"]
+tagfile = tagfiles[0]
+
+# Start reading from the bz2 archive of games
+reader = subprocess.Popen(
+    ["bzcat", str(Path("data/lichess_db_standard_rated_2018-04.pgn.bz2"))], # Reads the contents of a .bz2 archive buffered
+    stdout=PIPE,  # Pipe directly into the next proc
+    bufsize=1_000_000 # 1Mb
+)
+
+# Pipe the buffered output into the modified pgn-extract binary
+processer = subprocess.Popen(
+    [
+        "./vendor/pgn-extract/pgn-extract",
+        "-D",
+        "-W",
+        "-7",
+        "--evaluation",
+        "--addfencastling",
+        "--fencomments",
+        f"-t{tagfile}"
+    ],
+    stdin=reader.stdout,
+    bufsize=100_000, # 100Kb
+    universal_newlines=True,
+    stdout=PIPE,
+    stderr=DEVNULL
+)
+
+
 def process_match(match: re.Match) -> T_match_row:
+    """Parse a matched ply into a fen string, evaluation and ply number"""
     turn, player, move, clock_raw, eval_raw, fen_raw = match.groups()
     # Calculate the ply
     turn = int(turn)
@@ -44,7 +73,11 @@ def process_match(match: re.Match) -> T_match_row:
     return (ply, fen, evaluation)
 
 def process_game(game: str) -> T_match_row:
-    _, body, _ = game.split("\n\n")
+    """Match and process all the ply in a game into fields"""
+    items = game.split("\n\n")
+    if len(items) < 2:
+        raise ValueError(r"\n\n delimeter not present")
+    body = items[1]
     body = body.replace("\n", "")
     """
     Turn - Ply (. | ...) - Algebraic move - Clock - Evaluation - FEN string
@@ -66,30 +99,10 @@ def bitboard_from_fen(fen_string: str) -> tf.Tensor:
             |_______________|
 
     axis 2 contains bitboard slices for each piece type in the ordering:
-    WHITE:
-        - K
-        - Q
-        - R
-        - B
-        - N
-        - P
-    BLACK:
-        - K
-        - Q
-        - R
-        - B
-        - N
-        - P
+    WHITE : K Q R B N P
+    BLACK : K Q R B N P
     """
     fields = fen_string.split(' ')
-    # Note some fen strings are supplied without castling rights
-    if len(fields) != 6:
-        return False
-
-    """
-    NEED to handle the case where the player to move is not separated from the fen string...
-    """
-
     placement = fields[0]
     ranks = placement.split("/")
     # The ranks are given in reverse order, so index 0
@@ -131,18 +144,7 @@ def bitboard_from_fen(fen_string: str) -> tf.Tensor:
     # ply = to_move + 2 * (int(fields[5]) - to_move)
     return tf.convert_to_tensor(bitboard, dtype=tf.bool, name="bitboard")
 
-# Batch dimension (handled by tf.data)
-# Chunk dimension (handled by me / tfdata (window size!))
-# Board shape (8, 8, 12) (all me)
-
-def data_generator(
-    # n_items: int,
-    # cached: bool = True,
-    # buf_size: int = 1,
-    # shuffled: bool = True,
-    bracket: int,
-    file: Path = Path("data/lichess_db_standard_rated_2018-04.pgn.bz2"),
-    ):
+def game_generator():
     """
     Generator function which yields whole games from the specified bz2 archive
 
@@ -152,31 +154,6 @@ def data_generator(
     returns:
         generator[(ply: int, fen: str, evaluation: float)]
     """
-    tagfile = "tags_900_1100" if bracket == 1 else "tags_1900_2100"
-    # Start reading from the bz2 archive
-    reader = subprocess.Popen(
-        ["bzcat", str(file)], # Opens and sequentially reads the contents of a bz2 archive
-        stdout=PIPE,  # Allow feeding directly into the next process
-        bufsize=10240 # 10K
-    )
-    # Pipe the buffered output into the modified pgn-extract binary
-    processer = subprocess.Popen(
-        [
-            "./vendor/pgn-extract/pgn-extract",
-            "-D",
-            "-W",
-            "-7",
-            "--evaluation",
-            "--addfencastling",
-            "--fencomments",
-            f"-t{tagfile}"
-        ],
-        stdin=reader.stdout,
-        bufsize=1024, # 1K
-        universal_newlines=True,
-        stdout=PIPE,
-        stderr=DEVNULL
-    )
     linebuffer = []
     for line in processer.stdout:
         # Check if the line to append is the first tag ([Event])
@@ -192,17 +169,10 @@ def data_generator(
         linebuffer.append(line)
 
 def move_stream():
-    # BUF_SIZE = 100
-    # SHUFFLE = True
-
-    # Get stream of games
-    # game_stream = data_generator(bracket=1)
-    # Create a buffer of size B
-    # gamebuf = []
+    """
+    Generates a coherent stream of positions, with associated stream id and evaluation
+    """
     seq_id = 0
-
-    # define shuffle here
-    # shuffle = shuffle() if SHUFFLE else lambda x: x
 
     while True:
         # # Fill the buffer from the stream
@@ -211,7 +181,7 @@ def move_stream():
         # # Shuffle the buffer (?)
         # # shuffle(game_buffer)
 
-        for game in data_generator(bracket=1):
+        for game in game_generator():
             for _, fen, ev in game:
                 # Decode FEN
                 bitboard = bitboard_from_fen(fen)
@@ -226,7 +196,7 @@ def move_stream():
 def move_stream_no_bitboard():
     seq_id = 0
     while True:
-        for game in data_generator(bracket=1):
+        for game in game_generator():
             for _, _, ev in game:
                 # Decode FEN
                 evaluation = tf.reshape(
@@ -242,8 +212,7 @@ def create_tfdata_set(
     shuffle_bufsize: int = 0,
     batch_size: int = 4,
     chunk_size: int = 3,
-    use_bitboard: bool = True,
-    skip: int = 0
+    use_bitboard: bool = True
     ):
     """
     Returns a fully formed tf.data.Dataset instance
@@ -265,8 +234,6 @@ def create_tfdata_set(
             move_stream_no_bitboard,
             output_signature=T_tfdata_output
         )
-    if skip:
-        ds = ds.skip(skip)
     ds = ds.take(n_items)
     ds = ds.window(chunk_size, 1, stride=3, drop_remainder=True)
     ds = ds.flat_map(window_to_nested_ds)
@@ -275,3 +242,13 @@ def create_tfdata_set(
     ds = ds.batch(batch_size, drop_remainder=True)
     ds = ds.cache()
     return ds.prefetch(tf.data.AUTOTUNE)
+
+def collect_datasets(
+    n_batches: int,
+    batch_size: int,
+    chunk_size: int
+    ):
+    n_items = n_batches * batch_size
+    gen_ds = create_tfdata_set(n_items=n_items, batch_size=batch_size, chunk_size=chunk_size, use_bitboard=True)
+    dis_ds = create_tfdata_set(n_items=n_items, batch_size=batch_size, chunk_size=chunk_size, use_bitboard=False)
+    return gen_ds, dis_ds

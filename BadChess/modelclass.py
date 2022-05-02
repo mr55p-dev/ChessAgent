@@ -36,10 +36,6 @@ class BaseGAN():
     def create_discriminator(self) -> T_model:
         ...
 
-    # @abstractmethod
-    # def set_metrics(self, metrics: T_metrics) -> None:
-    #     ...
-
     @abstractmethod
     def intrinsic_generator_loss(
         self,

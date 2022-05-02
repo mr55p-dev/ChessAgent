@@ -1,6 +1,6 @@
 import chunk
 import itertools
-from BadChess.generator import bitboard_from_fen, create_tfdata_set, data_generator, move_stream
+from BadChess.generator import bitboard_from_fen, create_tfdata_set, game_generator, move_stream
 import numpy as np
 import tensorflow as tf
 
@@ -11,7 +11,7 @@ def typecheck(move_row):
     assert type(eva) == float
 
 def test_raw_generator():
-    gen = data_generator(1)
+    gen = game_generator(1)
     for _ in range(10):
         moves = next(gen)
         [typecheck(i) for i in moves]
@@ -25,7 +25,7 @@ def test_raw_fen_whitespace():
     the proper whitespace, making decoding the string reliably
     impossible
     """
-    gen = data_generator(1)
+    gen = game_generator(1)
     for _ in range(1000):
         moves = next(gen)
         for _, fen, _ in moves:

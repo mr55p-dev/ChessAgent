@@ -168,10 +168,14 @@ def game_generator():
 
         linebuffer.append(line)
 
+# I choose to implement this function 2 times, since otherwise inside the while
+# loop i need to have a condition to check if we are using the bitboard, which will
+# need to be evaluated on each iteration. Since i am making optimizations at the time
+# of writing this change I know that the functions here dont need to change, so just
+# statically implementing it twice and setting a reference to the right one further down
+# feels like it should be a decent improvement in this context; forgive me DRY...
 def move_stream():
-    """
-    Generates a coherent stream of positions, with associated stream id and evaluation
-    """
+    """Generates a coherent stream of positions, with associated stream id and evaluation"""
     seq_id = 0
 
     while True:
@@ -182,7 +186,7 @@ def move_stream():
         # # shuffle(game_buffer)
 
         for game in game_generator():
-            for _, fen, ev in game:
+            for ply, fen, ev in game:
                 # Decode FEN
                 bitboard = bitboard_from_fen(fen)
                 evaluation = tf.reshape(
@@ -221,6 +225,7 @@ def create_tfdata_set(
     if use_bitboard:
         window_to_nested_ds = lambda b, e, s: tf.data.Dataset.zip((b, e, s)).batch(chunk_size, drop_remainder=True)
         drop_game_crossover = lambda b, e, s: tf.equal(tf.size(tf.unique(s)[0]), 1)
+        clip_norm_evaluation = lambda b, e, s: (b, tf.divide(tf.clip_by_value(e, -40, 40), tf.constant(40, dtype=tf.float32)), s)
         remove_seqid = lambda b, e, s: (b, e)
         ds = tf.data.Dataset.from_generator(
             move_stream,
@@ -229,12 +234,14 @@ def create_tfdata_set(
     else:
         window_to_nested_ds = lambda e, s: tf.data.Dataset.zip((e, s)).batch(chunk_size, drop_remainder=True)
         drop_game_crossover = lambda e, s: tf.equal(tf.size(tf.unique(s)[0]), 1)
+        clip_norm_evaluation = lambda e, s: (tf.divide(tf.clip_by_value(e, -40, 40), tf.constant(40, dtype=tf.float32)), s)
         remove_seqid = lambda e, s: e
         ds = tf.data.Dataset.from_generator(
             move_stream_no_bitboard,
             output_signature=T_tfdata_output
         )
     ds = ds.take(n_items)
+    ds = ds.map(clip_norm_evaluation)
     ds = ds.window(chunk_size, 1, stride=3, drop_remainder=True)
     ds = ds.flat_map(window_to_nested_ds)
     ds = ds.filter(drop_game_crossover)
@@ -242,13 +249,3 @@ def create_tfdata_set(
     ds = ds.batch(batch_size, drop_remainder=True)
     ds = ds.cache()
     return ds.prefetch(tf.data.AUTOTUNE)
-
-def collect_datasets(
-    n_batches: int,
-    batch_size: int,
-    chunk_size: int
-    ):
-    n_items = n_batches * batch_size
-    gen_ds = create_tfdata_set(n_items=n_items, batch_size=batch_size, chunk_size=chunk_size, use_bitboard=True)
-    dis_ds = create_tfdata_set(n_items=n_items, batch_size=batch_size, chunk_size=chunk_size, use_bitboard=False)
-    return gen_ds, dis_ds

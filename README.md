@@ -5,3 +5,8 @@ Lets answer this!
 ## Build the games
 
 1. Build a local binary of `pgn-extract` using the makefile at `vendor/pgn-extract/src/Makefile`
+
+## todos
+
+- [x] Clip and normalize the evaluations to some reasonable number
+- [ ] Implement RNN stuff

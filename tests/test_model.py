@@ -1,12 +1,12 @@
-from BadChess.model import create_discriminator, create_generator
+from BadChess.modelclass import ConcreteGAN
 import tensorflow as tf
 
+
 def test_generator():
-    G = create_generator()
+    G = ConcreteGAN.create_generator()
     assert isinstance(G, tf.keras.models.Model)
 
 def test_discriminator():
-    D = create_discriminator()
+    D = ConcreteGAN.create_discriminator()
     assert isinstance(D, tf.keras.models.Model)
 
-    

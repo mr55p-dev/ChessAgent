@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from pathlib import Path
 from readline import add_history
 from typing import Iterable, List, Tuple
 import tensorflow as tf
@@ -175,6 +176,10 @@ class BaseGAN():
             if not target_steps:
                 target_steps = step
         # callbacks.on_train_end()
+
+    def save_generator(self, path: Path) -> None:
+        self.generator.save(path)
+
 
 mse = tf.keras.losses.MeanSquaredError()
 bce = tf.keras.losses.BinaryCrossentropy()

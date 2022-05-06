@@ -1,6 +1,9 @@
+from math import inf
+from pathlib import Path
 from typing import List, Tuple
 import chess
 from random import randint
+import tensorflow as tf
 
 from BadChess.generator import bitboard_from_fen
 
@@ -14,7 +17,10 @@ For a position
 - Recurse to depth d
 """
 
-model = lambda x: randint(0, 10)
+def load_model(path: Path):
+    return tf.keras.models.load_model(path)
+
+model = load_model(Path("./generator_test"))
 class Searched:
     num = 0
 
@@ -24,11 +30,17 @@ def search(board: chess.Board, depth: int, max_or_min: bool, alpha: int, beta: i
 
         fen = board.fen()
         bitboard = bitboard_from_fen(fen)
-        return None, model(bitboard)
+        bitboard = tf.expand_dims(bitboard, 0)
+
+        ev = model(bitboard)
+        ev = tf.squeeze(ev)
+        ev = float(ev)
+
+        return None, ev
 
     bestIdx = None
     if max_or_min:
-        maxEval = -100_000
+        maxEval = -inf
         for idx, move in enumerate(board.legal_moves):
             board.push(move)
             _, newEval = search(board, depth - 1, not max_or_min, alpha, beta)
@@ -43,7 +55,7 @@ def search(board: chess.Board, depth: int, max_or_min: bool, alpha: int, beta: i
         return bestIdx, maxEval
 
     else:
-        minEval = 100_000
+        minEval = inf
         for idx, move in enumerate(board.legal_moves):
             board.push(move)
             _, newEval = search(board, depth - 1, not max_or_min, alpha, beta)

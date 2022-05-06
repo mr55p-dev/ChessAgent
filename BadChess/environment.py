@@ -14,30 +14,44 @@ For a position
 - Follow the best choice
 - Recurse to depth d
 """
-
-def load_model(path: Path):
-    return tf.keras.models.load_model(path)
-class Meta:
+class ModelMeta:
     num = 0
-    model = load_model(Path("./generator_test"))
+    interpreter = None
+    inp = None
+    out = None
+
     @classmethod
-    def reset(cls):
+    def reset_score(cls):
         cls.num = 0
 
     @classmethod
-    def set_model(cls, model):
-        cls.model = model
+    def set_interpreter(cls, interpreter):
+        cls.interpreter = interpreter
+
+    @classmethod
+    def set_input(cls, input_tensor_index):
+        cls.inp = input_tensor_index
+
+    @classmethod
+    def set_output(cls, output_tensor_index):
+        cls.out = output_tensor_index
+
+    @classmethod
+    def infer(cls, tensor):
+        cls.interpreter.set_tensor(cls.inp, tf.expand_dims(tf.cast(tensor, tf.float32), 0))
+        cls.interpreter.invoke()
+        return cls.interpreter.get_tensor(cls.out)
 
 def search(board: chess.Board, depth: int, max_or_min: bool, alpha: int, beta: int):
     """Basic implementation of alpha-beta pruning to search and find the best move in a given position"""
     if depth  == 0:
-        Meta.num += 1
+        ModelMeta.num += 1
         #
         fen = board.fen()
         bitboard = bitboard_from_fen(fen)
         bitboard = tf.expand_dims(bitboard, 0)
 
-        ev = Meta.model(bitboard)
+        ev = ModelMeta.infer(bitboard)
         ev = tf.squeeze(ev)
         ev = float(ev)
 

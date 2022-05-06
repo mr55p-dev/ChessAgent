@@ -8,35 +8,51 @@ from tqdm import trange
 from BadChess.metrics import Loss
 
 
+# Function types
 T_model = keras.models.Model
 T_tensor = tf.Tensor
 T_metrics = List[tf.keras.metrics.Metric]
 T_opt = keras.optimizers.Optimizer
 T_cblist = keras.callbacks.CallbackList
 
+# Loss functions to be used at the module level
+mse = tf.keras.losses.MeanSquaredError()
+bce = tf.keras.losses.BinaryCrossentropy()
 
 class BaseGAN():
     def __init__(self) -> None:
+        # Models
         self.generator: T_model = self.create_generator()
         self.discriminator: T_model = self.create_discriminator()
-        self.metrics: T_metrics
+
+        # Model optimizers
         self.G_opt: T_opt = tf.keras.optimizers.Adam()
         self.D_opt: T_opt = tf.keras.optimizers.Adam()
-        self.cblist: T_cblist
 
+        # Model metrics
         self.M_gen_rmse = tf.keras.metrics.MeanSquaredError()
         self.M_dis_accuracy = tf.keras.metrics.Accuracy()
         self.M_gen_loss = Loss(name="gen_loss")
         self.M_dis_loss = Loss(name="dis_loss")
 
+        # Model logs
+        self.logs = {
+            "gen loss" : [],
+            "dis loss" : [],
+            "gen rmse" : [],
+            "dis acc" : [],
+        }
+
     @staticmethod
     @abstractmethod
     def create_generator() -> T_model:
+        """Function returning an uncompiled keras model for the generator"""
         ...
 
     @staticmethod
     @abstractmethod
     def create_discriminator() -> T_model:
+        """Function returning uncompiled keras model for the discriminator"""
         ...
 
     @abstractmethod
@@ -44,12 +60,14 @@ class BaseGAN():
         self,
         prediction: T_tensor,
         truth: T_tensor) -> T_tensor:
+        """Function computing the generator loss on the evaluation"""
         ...
 
     @abstractmethod
     def extrinsic_generator_loss(
         self,
         discriminator_output: T_tensor) -> T_tensor:
+        """Function computing the generator loss based on the discriminators categotisation"""
         ...
 
     @abstractmethod
@@ -58,9 +76,12 @@ class BaseGAN():
         real_guess: T_tensor,
         fake_guess: T_tensor
         ) -> T_tensor:
+        """Function computing the discriminators total loss"""
         ...
 
+    @tf.function
     def _trainstep(self, batch_G: Tuple[T_tensor, T_tensor], batch_D: T_tensor):
+        """Implements training of one batch of data"""
         # Split batch_G into feature and label
         batch_G_bitboard, batch_G_eval = batch_G
 
@@ -97,6 +118,7 @@ class BaseGAN():
                 )
             )
 
+        # Update metric state
         self.M_gen_rmse.update_state(G_pred_eval, batch_G_eval)
         self.M_dis_accuracy.update_state(tf.clip_by_value(tf.round(D_pred_real), 0, 1), tf.ones_like(D_pred_real))
         self.M_dis_accuracy.update_state(D_pred_fake, tf.zeros_like(D_pred_fake))
@@ -112,11 +134,22 @@ class BaseGAN():
         self.D_opt.apply_gradients(zip(dL_D, self.discriminator.trainable_weights))
 
     def get_progbar_values(self):
+        """Logs and stores metric state at the end of an epoch"""
+        gen_loss = self.M_gen_loss.result()
+        dis_loss = self.M_dis_loss.result()
+        gen_rmse = self.M_gen_rmse.result()
+        dis_acc = self.M_dis_accuracy.result()
+
+        self.logs["gen loss"].append(gen_loss)
+        self.logs["dis loss"].append(dis_loss)
+        self.logs["gen rmse"].append(gen_rmse)
+        self.logs["dis acc"].append(dis_acc)
+
         return [
-                ("Gen loss", self.M_gen_loss.result()),
-                ("Dis loss", self.M_dis_loss.result()),
-                ("Gen RMSE", self.M_gen_rmse.result()),
-                ("Dis accuracy", self.M_dis_accuracy.result())
+                ("Gen loss", gen_loss),
+                ("Dis loss", dis_loss),
+                ("Gen RMSE", gen_rmse),
+                ("Dis accuracy", dis_acc)
             ]
 
     def train(
@@ -127,8 +160,7 @@ class BaseGAN():
         ds_val_generator = None,
         ds_val_discriminator = None,
         ):
-        # Use the progressbar callback!
-        # https://www.tensorflow.org/api_docs/python/tf/keras/callbacks/CallbackList
+        """Train the model over the data for the specified number of epochs"""
         self.N_epochs = 100
         self.batch_size = 20
         self.chunk_size = 1
@@ -175,13 +207,11 @@ class BaseGAN():
             if not target_steps:
                 target_steps = step
         # callbacks.on_train_end()
+        return self.logs
 
     def save_generator(self, path: Path) -> None:
-        self.generator.save(path)
+        self.generator.save(str(path))
 
-
-mse = tf.keras.losses.MeanSquaredError()
-bce = tf.keras.losses.BinaryCrossentropy()
 class ConcreteGAN(BaseGAN):
     @staticmethod
     def create_generator() -> T_model:

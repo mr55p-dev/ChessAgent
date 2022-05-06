@@ -9,4 +9,5 @@ Lets answer this!
 ## todos
 
 - [x] Clip and normalize the evaluations to some reasonable number
-- [ ] Implement RNN stuff
+- [x] Implement RNN stuff
+- [ ] Fix the discriminator accuracy issue

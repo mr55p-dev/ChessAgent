@@ -1,5 +1,5 @@
 import chess
-from BadChess.environment import search, Meta
+from BadChess.environment import search, ModelMeta
 from math import inf
 
 # Setup some stuff
@@ -10,8 +10,8 @@ while not (endstate := board.is_game_over()):
     if board.turn == chess.WHITE:
         bestMove, withEvaluation = search(board, 2, True, -inf, inf)
         print(bestMove)
-        print(f"Automated move: {bestMove} (searched {Meta.num} positions).")
-        Meta.reset()
+        print(f"Automated move: {bestMove} (searched {ModelMeta.num} positions).")
+        ModelMeta.reset()
 
         board.push(bestMove)
         print(board)

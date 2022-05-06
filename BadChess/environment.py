@@ -23,6 +23,9 @@ def load_model(path: Path):
 model = load_model(Path("./generator_test"))
 class Searched:
     num = 0
+    @classmethod
+    def reset(cls):
+        cls.num = 0
 
 def search(board: chess.Board, depth: int, max_or_min: bool, alpha: int, beta: int):
     if depth  == 0:

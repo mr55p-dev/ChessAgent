@@ -17,24 +17,27 @@ For a position
 
 def load_model(path: Path):
     return tf.keras.models.load_model(path)
-
-model = load_model(Path("./generator_test"))
-class Searched:
+class Meta:
     num = 0
+    model = load_model(Path("./generator_test"))
     @classmethod
     def reset(cls):
         cls.num = 0
 
+    @classmethod
+    def set_model(cls, model):
+        cls.model = model
+
 def search(board: chess.Board, depth: int, max_or_min: bool, alpha: int, beta: int):
     """Basic implementation of alpha-beta pruning to search and find the best move in a given position"""
     if depth  == 0:
-        Searched.num += 1
+        Meta.num += 1
         #
         fen = board.fen()
         bitboard = bitboard_from_fen(fen)
         bitboard = tf.expand_dims(bitboard, 0)
 
-        ev = model(bitboard)
+        ev = Meta.model(bitboard)
         ev = tf.squeeze(ev)
         ev = float(ev)
 

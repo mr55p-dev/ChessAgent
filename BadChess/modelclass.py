@@ -237,14 +237,14 @@ class RNNGAN(BaseGAN):
         l = wrap_td(keras.layers.Flatten())(l)
 
         l = keras.layers.SimpleRNN(128, activation='relu', return_sequences=True)(l)
-        l = keras.layers.SimpleRNN(128, activation='relu', return_sequences=False)(l)
-        o = keras.layers.Dense(1, dtype=tf.float32)(l)
+        l = keras.layers.SimpleRNN(128, activation='relu', return_sequences=True)(l)
+        o = wrap_td(keras.layers.Dense(1, dtype=tf.float32))(l)
 
         return keras.models.Model(inputs=i, outputs=o)
 
     @staticmethod
     def create_discriminator() -> T_model:
-        i = keras.Input(shape=(1,), dtype=tf.float32)
+        i = keras.Input(shape=(3, 1), dtype=tf.float32)
         l = keras.layers.SimpleRNN(128, activation='relu')(i)
         l = keras.layers.Dense(64, dtype=tf.float32)(l)
         o = keras.layers.Dense(1, dtype=tf.float32)(l)

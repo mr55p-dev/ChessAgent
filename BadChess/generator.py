@@ -211,6 +211,7 @@ def move_stream_no_bitboard():
             # Upadte the sequence id after each game
             seq_id += 1
 
+
 def create_tfdata_set(
     n_items: int = 512,
     shuffle_bufsize: int = 0,

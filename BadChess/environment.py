@@ -29,7 +29,7 @@ def search(board: chess.Board, depth: int, max_or_min: bool, alpha: int, beta: i
     """Basic implementation of alpha-beta pruning to search and find the best move in a given position"""
     if depth  == 0:
         Searched.num += 1
-        # 
+        #
         fen = board.fen()
         bitboard = bitboard_from_fen(fen)
         bitboard = tf.expand_dims(bitboard, 0)

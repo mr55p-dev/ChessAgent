@@ -60,7 +60,6 @@ class BaseGAN():
         ) -> T_tensor:
         ...
 
-    @tf.function
     def _trainstep(self, batch_G: Tuple[T_tensor, T_tensor], batch_D: T_tensor):
         # Split batch_G into feature and label
         batch_G_bitboard, batch_G_eval = batch_G
@@ -183,34 +182,6 @@ class BaseGAN():
 
 mse = tf.keras.losses.MeanSquaredError()
 bce = tf.keras.losses.BinaryCrossentropy()
-
-class ConcreteGANBasic(BaseGAN):
-    def create_generator(self) -> T_model:
-        i = keras.Input(shape=(8, 8, 12), dtype=tf.float32)
-        l = keras.layers.Flatten()(i)
-        l = keras.layers.Dense(200)(l)
-        l = keras.layers.Dense(200)(l)
-        o = keras.layers.Dense(1, dtype=tf.float32)(l)
-        return keras.models.Model(inputs=i, outputs=o)
-
-    def create_discriminator(self) -> T_model:
-        i = keras.Input(shape=(1,), dtype=tf.float32)
-        l = keras.layers.Dense(100)(i)
-        l = keras.layers.Dense(100)(l)
-        o = keras.layers.Dense(1, dtype=tf.float32)(l)
-        return keras.models.Model(inputs=i, outputs=o, name="Discriminator")
-
-    def intrinsic_generator_loss(self, prediction: T_tensor, truth: T_tensor) -> T_tensor:
-        return mse(prediction, truth)
-
-    def extrinsic_generator_loss(self, discriminator_output: T_tensor) -> T_tensor:
-        return bce(tf.zeros_like(discriminator_output), discriminator_output)
-
-    def discriminator_loss(self, real_guess: T_tensor, fake_guess: T_tensor) -> T_tensor:
-        real_loss = bce(tf.ones_like(real_guess), real_guess)
-        fake_loss = bce(tf.zeros_like(fake_guess), fake_guess)
-        return tf.add(real_loss, fake_loss)
-
 class ConcreteGAN(BaseGAN):
     @staticmethod
     def create_generator() -> T_model:
@@ -255,21 +226,18 @@ class ConcreteGAN(BaseGAN):
 class RNNGAN(BaseGAN):
     @staticmethod
     def create_generator() -> T_model:
-        i = keras.Input(shape=(8, 8, 12), dtype=tf.float32)
-        l = keras.layers.Conv2D(24, (3, 3), padding="same")(i)
-        l = keras.layers.Activation('relu')(l)
-        l = keras.layers.Conv2D(36, (3, 3), padding="same")(l)
-        l = keras.layers.Activation('relu')(l)
-        l = keras.layers.Conv2D(48, (3, 3), padding="same")(l)
-        l = keras.layers.Activation('relu')(l)
-        l = keras.layers.MaxPool2D((2, 2))(l)
-        l = keras.layers.Conv2D(64, (3, 3), padding="same")(l)
-        l = keras.layers.Activation('relu')(l)
-        l = keras.layers.Conv2D(64, (3, 3), padding="same")(l)
-        l = keras.layers.Activation('relu')(l)
-        l = keras.layers.Flatten()(l)
-        l = keras.layers.Dense(128)(l)
-        l = keras.layers.Dense(32)(l)
+
+        wrap_td = lambda x: keras.layers.TimeDistributed(x)
+
+        i = keras.Input(shape=(3, 8, 8, 12), dtype=tf.float32)
+        l = wrap_td(keras.layers.Conv2D(64, (3, 3), padding="same"))(i)
+        l = wrap_td(keras.layers.Activation('relu'))(l)
+        l = wrap_td(keras.layers.Conv2D(64, (3, 3), padding="same"))(l)
+        l = wrap_td(keras.layers.Activation('relu'))(l)
+        l = wrap_td(keras.layers.Flatten())(l)
+
+        l = keras.layers.SimpleRNN(128, activation='relu', return_sequences=True)(l)
+        l = keras.layers.SimpleRNN(128, activation='relu', return_sequences=False)(l)
         o = keras.layers.Dense(1, dtype=tf.float32)(l)
 
         return keras.models.Model(inputs=i, outputs=o)
@@ -277,9 +245,10 @@ class RNNGAN(BaseGAN):
     @staticmethod
     def create_discriminator() -> T_model:
         i = keras.Input(shape=(1,), dtype=tf.float32)
-        l = keras.layers.Dense(100)(i)
-        l = keras.layers.Dense(100)(l)
+        l = keras.layers.SimpleRNN(128, activation='relu')(i)
+        l = keras.layers.Dense(64, dtype=tf.float32)(l)
         o = keras.layers.Dense(1, dtype=tf.float32)(l)
+
         return keras.models.Model(inputs=i, outputs=o, name="Discriminator")
 
     def intrinsic_generator_loss(self, prediction: T_tensor, truth: T_tensor) -> T_tensor:

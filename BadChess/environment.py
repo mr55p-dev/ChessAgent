@@ -1,8 +1,6 @@
 from math import inf
 from pathlib import Path
-from typing import List, Tuple
 import chess
-from random import randint
 import tensorflow as tf
 
 from BadChess.generator import bitboard_from_fen
@@ -28,9 +26,10 @@ class Searched:
         cls.num = 0
 
 def search(board: chess.Board, depth: int, max_or_min: bool, alpha: int, beta: int):
+    """Basic implementation of alpha-beta pruning to search and find the best move in a given position"""
     if depth  == 0:
         Searched.num += 1
-
+        # 
         fen = board.fen()
         bitboard = bitboard_from_fen(fen)
         bitboard = tf.expand_dims(bitboard, 0)
@@ -41,54 +40,34 @@ def search(board: chess.Board, depth: int, max_or_min: bool, alpha: int, beta: i
 
         return None, ev
 
-    bestIdx = None
+    bestMove = None
     if max_or_min:
         maxEval = -inf
-        for idx, move in enumerate(board.legal_moves):
+        for move in board.legal_moves:
             board.push(move)
             _, newEval = search(board, depth - 1, not max_or_min, alpha, beta)
             board.pop()
 
             if newEval > maxEval:
                 maxEval = newEval
-                bestIdx = idx
+                bestMove = move
             alpha = max(alpha, newEval)
             if beta <= alpha:
                 break
-        return bestIdx, maxEval
+        return bestMove, maxEval
 
     else:
         minEval = inf
-        for idx, move in enumerate(board.legal_moves):
+        for move in board.legal_moves:
             board.push(move)
             _, newEval = search(board, depth - 1, not max_or_min, alpha, beta)
             board.pop()
 
             if newEval < minEval :
                 minEval = newEval
-                bestIdx = idx
+                bestMove = move
 
             beta = min(beta, newEval)
             if beta <= alpha:
                 break
-        return bestIdx, minEval
-
-
-    # Setup the iterative recursion
-    bestIdx = None
-    for idx, move in enumerate(board.legal_moves):
-        board.push(move)
-        _, newEval = search(board, depth - 1, not max_or_min, alpha, beta)
-        if op(newEval):
-            maxEval = newEval
-            bestIdx = idx
-        alpha = alphaOp(alpha, newEval)
-        if beta <= alpha:
-            break
-
-        board.pop()
-    return bestIdx, maxEval
-
-
-
-
+        return bestMove, minEval

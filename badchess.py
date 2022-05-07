@@ -32,8 +32,8 @@ def convert_and_save_model(model, path: Path) -> None:
 
 def run_train(args):
     """Run model training"""
-    gen_ds = create_tfdata_set(n_items=args.num_train, batch_size=args.batch, chunk_size=3, use_bitboard=True)
-    dis_ds = create_tfdata_set(n_items=args.num_train, batch_size=args.batch, chunk_size=3, use_bitboard=False)
+    gen_ds = create_tfdata_set(n_items=args.num_train, batch_size=args.batch, chunk_size=args.chunk_size, use_bitboard=True)
+    dis_ds = create_tfdata_set(n_items=args.num_train, batch_size=args.batch, chunk_size=args.chunk_size, use_bitboard=False)
 
     model = RNNGAN()
     logs = model.train(
@@ -63,7 +63,7 @@ def load_model(model_path: Path):
 
 def play_vs_bot(args):
     interpreter, (inp, out) = load_model(args.model)
-    Config.set_chunksize(3)
+    Config.set_chunksize(args.chunk_size)
     Config.set_interpreter(interpreter)
     Config.set_input(inp)
     Config.set_output(out)
@@ -93,7 +93,7 @@ def play_vs_bot(args):
 def run_game_vs_stockfish(args) -> None:
     """Play a game against the model specified in `args.model_path`"""
     interpreter, (inp, out) = load_model(args.model)
-    Config.set_chunksize(3)
+    Config.set_chunksize(args.chunk_size)
     Config.set_interpreter(interpreter)
     Config.set_input(inp)
     Config.set_output(out)
@@ -134,7 +134,7 @@ def run_game_vs_self(args) -> None:
     """Play a game against the twp models specified in `args.white_model` and `args.black_model`"""
     w_interpreter, (w_inp, w_out) = load_model(args.white_model)
     b_interpreter, (b_inp, b_out) = load_model(args.black_model)
-    Config.set_chunksize(3)
+    Config.set_chunksize(args.chunk_size)
     print = lambda x: print(x) if args.verbose else lambda x: None
 
     # Setup some stuff, use the stockfish context manager
@@ -174,6 +174,7 @@ training.add_argument("-e", "--epochs", help="Number of epochs to train for.", t
 training.add_argument("-b", "--batch", help="Batch size.", type=int, default=128)
 training.add_argument("-n", "--num_train", help="Number of examples to train on.", type=int, default=10_000)
 training.add_argument("-o", "--output", help="Output path to write a .tflite file to.", type=str, default="generator_model.tflite")
+training.add_argument("-c", "--chunk_size", help="Number of elements to use in prediction learning", type=int, default=3)
 training.add_argument("--graphs", help="Use graphs?", default=False, action="store_true", dest="graph")
 training.set_defaults(func=run_train)
 
@@ -181,6 +182,7 @@ training.set_defaults(func=run_train)
 vs = subparsers.add_parser("vs")
 vs.add_argument("model", help="Path to the model file")
 vs.add_argument("-d", "--engine_depth", help="Search depth for the engine moves.", type=int, default=4)
+vs.add_argument("-c", "--chunk_size", help="Number of elements to use in prediction learning", type=int, default=3)
 vs.set_defaults(func=play_vs_bot)
 
 # Put two models against one andother
@@ -190,6 +192,7 @@ game_self.add_argument("black_model", help="Path to the black model file")
 game_self.add_argument("-d", "--engine_depth", help="Search depth for the engine moves.", type=int, default=4)
 game_self.add_argument("-s", "--start", help="Starting position", type=str, default=chess.STARTING_FEN)
 game_self.add_argument("--verbose", help="How many messages to print", default=False, action="store_true")
+game_self.add_argument("-c", "--chunk_size", help="Number of elements to use in prediction learning", type=int, default=3)
 game_self.set_defaults(func=run_game_vs_self)
 
 # Put a model against stockfish
@@ -197,6 +200,7 @@ game = subparsers.add_parser("play")
 game.add_argument("model", help="Path to the model file")
 game.add_argument("-d", "--engine_depth", help="Search depth for the engine moves.", type=int, default=4)
 game.add_argument("-s", "--start", help="Starting position", type=str, default=chess.STARTING_FEN)
+game.add_argument("-c", "--chunk_size", help="Number of elements to use in prediction learning", type=int, default=3)
 game.add_argument("--stockfish_skill", help="Stockfish skill level prop (1-20)", type=int, default=20)
 game.add_argument("--stockfish_max_depth", help="Stockfish max depth", type=int, default=10)
 game.add_argument("--stockfish_max_time", help="Stockfish maximum thinking time (in ms)", type=int, default=2000)

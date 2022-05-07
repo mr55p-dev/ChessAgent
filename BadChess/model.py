@@ -259,7 +259,7 @@ class RNNGAN(BaseGAN):
 
         wrap_td = lambda x: keras.layers.TimeDistributed(x)
 
-        i = keras.Input(shape=(3, 8, 8, 12), dtype=tf.float32)
+        i = keras.Input(shape=(5, 8, 8, 12), dtype=tf.float32)
         l = wrap_td(keras.layers.Conv2D(34, (3, 3), padding="same"))(i)
         l = wrap_td(keras.layers.Activation('relu'))(l)
         l = wrap_td(keras.layers.Conv2D(32, (3, 3), padding="same"))(l)
@@ -278,7 +278,7 @@ class RNNGAN(BaseGAN):
 
     @staticmethod
     def create_discriminator() -> T_model:
-        i = keras.Input(shape=(3, 1), dtype=tf.float32)
+        i = keras.Input(shape=(5, 1), dtype=tf.float32)
         l = keras.layers.SimpleRNN(128, activation='relu')(i)
         l = keras.layers.Dense(128, dtype=tf.float32)(l)
         l = keras.layers.Activation('relu')(l)

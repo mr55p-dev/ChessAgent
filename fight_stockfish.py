@@ -2,13 +2,13 @@ import itertools
 import pprint
 
 from tqdm import tqdm
-from badchess import grid_search, run_game, parser
+from badchess import grid_search, run_game_vs_stockfish, parser
 
 
 def tourney(match_args, n_games):
     outcomes = []
     for i in tqdm(range(n_games)):
-        winner, termination, ply = run_game(match_args)
+        winner, termination, ply = run_game_vs_stockfish(match_args)
         outcomes.append(winner)
 
     engine_wins = len([i for i in outcomes if i == True])

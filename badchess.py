@@ -59,7 +59,37 @@ def load_model(model_path: Path):
     output_tensor_idx = interpreter.get_output_details()[0]["index"]
     return interpreter, (input_tensor_idx, output_tensor_idx)
 
-def run_game(args) -> None:
+def play_vs_bot(args):
+
+    interpreter, (inp, out) = load_model(args.model)
+    Config.set_chunksize(3)
+    Config.set_interpreter(interpreter)
+    Config.set_input(inp)
+    Config.set_output(out)
+
+    # Setup some stuff, use the stockfish context manager
+    board = chess.Board(chess.STARTING_BOARD_FEN)
+
+    while not board.is_game_over():
+        print(f"Ply {board.ply()} - {'white' if board.turn else 'black'} to move")
+        if board.turn == chess.WHITE:
+            bestMove, withEval = search(board, args.engine_depth, True, -inf, inf, ())
+            print(f"RNN move: {bestMove} (evaluated at {withEval}) (searched {Config.num} positions).")
+            Config.reset_score()
+
+            board.push(bestMove)
+            print(board)
+
+        else:
+            move = input("Make a move: ")
+            try:
+                board.push_san(move)
+                print(board)
+            except ValueError:
+                print("Bad move")
+                continue
+
+def run_game_vs_stockfish(args) -> None:
     """Play a game against the model specified in `args.model_path`"""
     interpreter, (inp, out) = load_model(args.model)
     Config.set_chunksize(3)
@@ -110,6 +140,11 @@ training.add_argument("-o", "--output", help="Output path to write a .tflite fil
 training.add_argument("--graphs", help="Use graphs?", default=False, action="store_true", dest="graph")
 training.set_defaults(func=run_train)
 
+vs = subparsers.add_parser("vs")
+vs.add_argument("model", help="Path to the model file")
+vs.add_argument("-d", "--engine_depth", help="Search depth for the engine moves.", type=int, default=4)
+vs.set_defaults(func=play_vs_bot)
+
 game = subparsers.add_parser("play")
 game.add_argument("model", help="Path to the model file")
 game.add_argument("-d", "--engine_depth", help="Search depth for the engine moves.", type=int, default=4)
@@ -119,7 +154,7 @@ game.add_argument("--stockfish_skill", help="Stockfish skill level prop (1-20)",
 game.add_argument("--stockfish_max_depth", help="Stockfish max depth", type=int, default=10)
 game.add_argument("--stockfish_max_time", help="Stockfish maximum thinking time (in ms)", type=int, default=2000)
 game.add_argument("--verbose", help="How many messages to print", default=False, action="store_true")
-game.set_defaults(func=run_game)
+game.set_defaults(func=run_game_vs_stockfish)
 
 # If we are calling this file directly, parse the args called
 if __name__ == '__main__':

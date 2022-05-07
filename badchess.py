@@ -40,26 +40,26 @@ def load_model(model_path: Path):
     interpreter = tf.lite.Interpreter(str(model_path))
     interpreter.allocate_tensors()
     input_tensor_idx = interpreter.get_input_details()[0]["index"]
-    output_tensor_idx = interpreter.get_input_details()[0]["index"]
+    output_tensor_idx = interpreter.get_output_details()[0]["index"]
     return interpreter, (input_tensor_idx, output_tensor_idx)
 
 def run_game(args) -> None:
     """Play a game against the model specified in `args.model_path`"""
     interpreter, (inp, out) = load_model(args.model)
+    ModelMeta.set_chunksize(3)
     ModelMeta.set_interpreter(interpreter)
     ModelMeta.set_input(inp)
     ModelMeta.set_output(out)
 
     # Setup some stuff
-    startfen = input("Starting position: ")
-    board = chess.Board(startfen if startfen else chess.STARTING_FEN)
+    board = chess.Board(args.start)
     while not board.is_game_over():
         print(f"Ply {board.ply()} - {'white' if board.turn else 'black'} to move")
         if board.turn == chess.WHITE:
-            bestMove, withEval = search(board, 2, True, -inf, inf)
+            bestMove, withEval = search(board, args.engine_depth, True, -inf, inf, ())
             print(bestMove)
             print(f"Automated move: {bestMove} (evaluated at {withEval}) (searched {ModelMeta.num} positions).")
-            ModelMeta.reset()
+            ModelMeta.reset_score()
 
             board.push(bestMove)
             print(board)
@@ -86,6 +86,8 @@ training.set_defaults(func=run_train)
 
 game = subparsers.add_parser("play")
 game.add_argument("model", help="Path to the model file")
+game.add_argument("-d", "--engine_depth", help="Search depth for the engine moves.", type=int, default=4)
+game.add_argument("-s", "--start", help="Starting position", type=str, default=chess.STARTING_FEN)
 game.set_defaults(func=run_game)
 
 args = parser.parse_args()

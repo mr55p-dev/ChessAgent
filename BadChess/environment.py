@@ -16,6 +16,7 @@ For a position
 """
 class ModelMeta:
     num = 0
+    chunksize = None
     interpreter = None
     inp = None
     out = None
@@ -38,36 +39,55 @@ class ModelMeta:
 
     @classmethod
     def infer(cls, tensor):
-        cls.interpreter.set_tensor(cls.inp, tf.expand_dims(tf.cast(tensor, tf.float32), 0))
+        cls.interpreter.set_tensor(cls.inp, tf.expand_dims(tensor, axis=0))
         cls.interpreter.invoke()
-        return cls.interpreter.get_tensor(cls.out)
+        out = cls.interpreter.get_tensor(cls.out)
+        return out
 
-def search(board: chess.Board, depth: int, max_or_min: bool, alpha: int, beta: int):
+    @classmethod
+    def set_chunksize(cls, size):
+        cls.chunksize = size
+
+def search(board: chess.Board, depth: int, max_or_min: bool, alpha: int, beta: int, bitboard_stack):
     """Basic implementation of alpha-beta pruning to search and find the best move in a given position"""
-    if depth  == 0:
-        ModelMeta.num += 1
-        #
-        fen = board.fen()
-        bitboard = bitboard_from_fen(fen)
-        bitboard = tf.expand_dims(bitboard, 0)
 
-        ev = ModelMeta.infer(bitboard)
+    # Create and cache the current bitboard state if we are at a low depth
+    if depth < ModelMeta.chunksize:
+        bitboard = bitboard_from_fen(board.fen())
+        bitboard_stack = (*bitboard_stack, bitboard)
+
+    if depth  == 0:
+        # Add a new increment to the number of models searched
+        ModelMeta.num += 1
+
+        if len(bitboard_stack) < ModelMeta.chunksize - 1:
+            # If the stack doesnt have enough cache, repeat the current element a couple times
+            bitboard_stack = bitboard_stack + [bitboard_stack[-1]] * (ModelMeta.chunksize - 1)
+            bitboard_stack = bitboard_stack[:ModelMeta.chunksize-1]
+
+        # Create a "time series" tensor of inputs of the previous states
+        bitboards = tf.stack(bitboard_stack, axis=0)
+
+        # Infer the evaluation, and then take the topmost evaluation
+        ev = ModelMeta.infer(bitboards)
         ev = tf.squeeze(ev)
-        ev = float(ev)
+        ev = float(ev[-1])
 
         return None, ev
 
+    # Alpha-beta pruning algorithm
     bestMove = None
     if max_or_min:
         maxEval = -inf
         for move in board.legal_moves:
             board.push(move)
-            _, newEval = search(board, depth - 1, not max_or_min, alpha, beta)
+            _, newEval = search(board, depth - 1, not max_or_min, alpha, beta, bitboard_stack)
             board.pop()
 
             if newEval > maxEval:
                 maxEval = newEval
                 bestMove = move
+            
             alpha = max(alpha, newEval)
             if beta <= alpha:
                 break
@@ -77,7 +97,7 @@ def search(board: chess.Board, depth: int, max_or_min: bool, alpha: int, beta: i
         minEval = inf
         for move in board.legal_moves:
             board.push(move)
-            _, newEval = search(board, depth - 1, not max_or_min, alpha, beta)
+            _, newEval = search(board, depth - 1, not max_or_min, alpha, beta, bitboard_stack)
             board.pop()
 
             if newEval < minEval :

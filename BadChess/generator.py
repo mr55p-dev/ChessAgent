@@ -142,7 +142,7 @@ def bitboard_from_fen(fen_string: str) -> tf.Tensor:
 
     # Ply
     # ply = to_move + 2 * (int(fields[5]) - to_move)
-    return tf.convert_to_tensor(bitboard, dtype=tf.bool, name="bitboard")
+    return tf.convert_to_tensor(bitboard, dtype=tf.float32, name="bitboard")
 
 def game_generator():
     """

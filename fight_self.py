@@ -2,13 +2,13 @@ import itertools
 import pprint
 
 from tqdm import tqdm
-from badchess import run_game_vs_stockfish, parser
+from badchess import run_game_vs_self, parser
 
 
 def tourney(match_args, n_games):
     outcomes = []
     for i in tqdm(range(n_games)):
-        winner, termination, ply = run_game_vs_stockfish(match_args)
+        winner, termination, ply = run_game_vs_self(match_args)
         outcomes.append(winner)
 
     engine_wins = len([i for i in outcomes if i == True])
@@ -17,27 +17,20 @@ def tourney(match_args, n_games):
 
     return engine_wins, draws, stockfish_wins
 
-
 def grid_search(n_games: int = 5):
-    # Stockfish parameters
-    stockfish_levels = ['1']
-    stockfish_depths = ['4']
-    stockfish_times = ['2000']
-
     # Engine parameters
     engine_depths = ['1']
-    models = ["./models/generator_test_model.tflite"]
-    param = ["play"]
+    whitemodels = ["./models/generator_test_model.tflite"]
+    blackmodels = ["./models/generator_test_model.tflite"]
+    param = ["playself"]
     results = []
 
     # Get all the combinations
     searches = itertools.product(
         param,
-        models,
-        ["--engine_depth"], engine_depths,
-        ["--stockfish_skill"], stockfish_levels,
-        ["--stockfish_max_depth"], stockfish_depths,
-        ["--stockfish_max_time"], stockfish_times
+        whitemodels,
+        blackmodels,
+        ["--engine_depth"], engine_depths
     )
 
     # Play a tournament for each combination

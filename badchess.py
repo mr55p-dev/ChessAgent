@@ -1,19 +1,22 @@
-import argparse
 from argparse import ArgumentParser
-import itertools
 from math import inf
 from pathlib import Path
-import pprint
+from chess_gif.gif_maker import Gifmaker
 
 import chess
 import matplotlib.pyplot as plt
 import tensorflow as tf
-from tqdm import tqdm
 
 from BadChess.environment import Config, search
 from BadChess.generator import create_tfdata_set
 from BadChess.model import RNNGAN
 from BadChess.stockfish import Stockfish
+
+"""
+Script with argparse-based utilities for:
+- Training a model and saving to a .tflite file
+- Loading and playing against a model
+"""
 
 
 def convert_and_save_model(model, path: Path) -> None:
@@ -60,7 +63,6 @@ def load_model(model_path: Path):
     return interpreter, (input_tensor_idx, output_tensor_idx)
 
 def play_vs_bot(args):
-
     interpreter, (inp, out) = load_model(args.model)
     Config.set_chunksize(3)
     Config.set_interpreter(interpreter)
@@ -129,9 +131,45 @@ def run_game_vs_stockfish(args) -> None:
     out = board.outcome()
     return out.winner, out.termination, board.ply()
 
+def run_game_vs_self(args) -> None:
+    """Play a game against the twp models specified in `args.white_model` and `args.black_model`"""
+    w_interpreter, (w_inp, w_out) = load_model(args.white_model)
+    b_interpreter, (b_inp, b_out) = load_model(args.black_model)
+    Config.set_chunksize(3)
+    print = lambda x: print(x) if args.verbose else lambda x: None
+
+    # Setup some stuff, use the stockfish context manager
+    board = chess.Board(args.start)
+    while not board.is_game_over():
+        print(f"Ply {board.ply()} - {'white' if board.turn else 'black'} to move")
+        if board.turn == chess.WHITE:
+            # Need to change the model that the search engine uses for each step...
+            Config.set_interpreter(w_interpreter)
+            Config.set_input(w_inp)
+            Config.set_output(w_out)
+
+        else:
+            Config.set_interpreter(b_interpreter)
+            Config.set_input(b_inp)
+            Config.set_output(b_out)
+
+        # Evaluate and make the move
+        bestMove, withEval = search(board, args.engine_depth, True, -inf, inf, ())
+        print(f"RNN move: {bestMove} (evaluated at {withEval}) (searched {Config.num} positions).")
+        Config.reset_score()
+
+        board.push(bestMove)
+        print(board)
+
+    # Check the board outcome
+    out = board.outcome()
+    return out.winner, out.termination, board.ply()
+
 # Argparse stuff
 parser = ArgumentParser("BadChess")
 subparsers = parser.add_subparsers()
+
+# Train a model
 training = subparsers.add_parser("train")
 training.add_argument("-e", "--epochs", help="Number of epochs to train for.", type=int, default=1)
 training.add_argument("-b", "--batch", help="Batch size.", type=int, default=128)
@@ -140,16 +178,26 @@ training.add_argument("-o", "--output", help="Output path to write a .tflite fil
 training.add_argument("--graphs", help="Use graphs?", default=False, action="store_true", dest="graph")
 training.set_defaults(func=run_train)
 
+# Play as yourself against a model
 vs = subparsers.add_parser("vs")
 vs.add_argument("model", help="Path to the model file")
 vs.add_argument("-d", "--engine_depth", help="Search depth for the engine moves.", type=int, default=4)
 vs.set_defaults(func=play_vs_bot)
 
+# Put two models against one andother
+game_self = subparsers.add_parser("playself")
+game_self.add_argument("white_model", help="Path to the white model file")
+game_self.add_argument("black_model", help="Path to the black model file")
+game_self.add_argument("-d", "--engine_depth", help="Search depth for the engine moves.", type=int, default=4)
+game_self.add_argument("-s", "--start", help="Starting position", type=str, default=chess.STARTING_FEN)
+game_self.add_argument("--verbose", help="How many messages to print", default=False, action="store_true")
+game_self.set_defaults(func=run_game_vs_self)
+
+# Put a model against stockfish
 game = subparsers.add_parser("play")
 game.add_argument("model", help="Path to the model file")
 game.add_argument("-d", "--engine_depth", help="Search depth for the engine moves.", type=int, default=4)
 game.add_argument("-s", "--start", help="Starting position", type=str, default=chess.STARTING_FEN)
-game.add_argument("--player", help="Are you playing or is stockfish?", action="store_true", default=False)
 game.add_argument("--stockfish_skill", help="Stockfish skill level prop (1-20)", type=int, default=20)
 game.add_argument("--stockfish_max_depth", help="Stockfish max depth", type=int, default=10)
 game.add_argument("--stockfish_max_time", help="Stockfish maximum thinking time (in ms)", type=int, default=2000)

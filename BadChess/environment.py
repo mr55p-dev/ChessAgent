@@ -60,10 +60,11 @@ def search(board: chess.Board, depth: int, max_or_min: bool, alpha: int, beta: i
         # Add a new increment to the number of models searched
         Config.num += 1
 
-        if len(bitboard_stack) < Config.chunksize - 1:
+        if len(bitboard_stack) < Config.chunksize:
             # If the stack doesnt have enough cache, repeat the current element a couple times
-            bitboard_stack = bitboard_stack + [bitboard_stack[-1]] * (Config.chunksize - 1)
-            bitboard_stack = bitboard_stack[:Config.chunksize-1]
+            full_arr_of_current_board = tuple([bitboard_stack[-1]] * Config.chunksize)
+            bitboard_stack = (*bitboard_stack, *full_arr_of_current_board)
+            bitboard_stack = bitboard_stack[:Config.chunksize]
 
         # Create a "time series" tensor of inputs of the previous states
         bitboards = tf.stack(bitboard_stack, axis=0)

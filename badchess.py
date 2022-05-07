@@ -1,14 +1,18 @@
-from argparse import ArgumentParser
 import argparse
-from pathlib import Path
-import chess
+from argparse import ArgumentParser
+import itertools
 from math import inf
-import tensorflow as tf
-import matplotlib.pyplot as plt
+from pathlib import Path
+import pprint
 
+import chess
+import matplotlib.pyplot as plt
+import tensorflow as tf
+from tqdm import tqdm
+
+from BadChess.environment import Config, search
 from BadChess.generator import create_tfdata_set
 from BadChess.model import RNNGAN
-from BadChess.environment import search, Config
 from BadChess.stockfish import Stockfish
 
 
@@ -62,36 +66,38 @@ def run_game(args) -> None:
     Config.set_interpreter(interpreter)
     Config.set_input(inp)
     Config.set_output(out)
+    print = lambda x: print(x) if args.verbose else lambda x: None
 
-    # Setup some stuff
+    # Setup some stuff, use the stockfish context manager
     board = chess.Board(args.start)
-    with Stockfish(1000) as stockfish:
+    with Stockfish(
+        args.stockfish_skill,
+        movetime=args.stockfish_max_time,
+        max_depth=args.stockfish_max_depth
+        ) as stockfish:
         while not board.is_game_over():
             print(f"Ply {board.ply()} - {'white' if board.turn else 'black'} to move")
             if board.turn == chess.WHITE:
                 bestMove, withEval = search(board, args.engine_depth, True, -inf, inf, ())
-                print(bestMove)
-                print(f"Automated move: {bestMove} (evaluated at {withEval}) (searched {Config.num} positions).")
+                print(f"RNN move: {bestMove} (evaluated at {withEval}) (searched {Config.num} positions).")
                 Config.reset_score()
 
                 board.push(bestMove)
                 print(board)
-            elif args.player:
-                move = input("Make a move: ")
-                try:
-                    board.push_san(move)
-                    print(board)
-                except ValueError:
-                    print("Bad move")
-                    continue
             else:
-                move_list = [i.uci() for i in board.move_stack]
-                stockfish.set_state(move_list)
+                # Set the board state for the engine and get the move
+                stockfish.set_state([i.uci() for i in board.move_stack])
                 move = stockfish.get_move()
-                board.push(chess.Move.from_uci(move))
+
+                # Push the move to the board
+                bestMove = chess.Move.from_uci(move)
+                board.push(bestMove)
+                print(f"Stockfish move: {bestMove}.")
                 print(board)
 
-    print(board.outcome())
+    # Check the board outcome
+    out = board.outcome()
+    return out.winner, out.termination, board.ply()
 
 # Argparse stuff
 parser = ArgumentParser("BadChess")
@@ -109,7 +115,13 @@ game.add_argument("model", help="Path to the model file")
 game.add_argument("-d", "--engine_depth", help="Search depth for the engine moves.", type=int, default=4)
 game.add_argument("-s", "--start", help="Starting position", type=str, default=chess.STARTING_FEN)
 game.add_argument("--player", help="Are you playing or is stockfish?", action="store_true", default=False)
+game.add_argument("--stockfish_skill", help="Stockfish skill level prop (1-20)", type=int, default=20)
+game.add_argument("--stockfish_max_depth", help="Stockfish max depth", type=int, default=10)
+game.add_argument("--stockfish_max_time", help="Stockfish maximum thinking time (in ms)", type=int, default=2000)
+game.add_argument("--verbose", help="How many messages to print", default=False, action="store_true")
 game.set_defaults(func=run_game)
 
-args = parser.parse_args()
-args.func(args)
+# If we are calling this file directly, parse the args called
+if __name__ == '__main__':
+    args = parser.parse_args()
+    args.func(args)

@@ -6,8 +6,8 @@ from math import inf
 import tensorflow as tf
 
 from BadChess.generator import create_tfdata_set
-from BadChess.modelclass import RNNGAN
-from BadChess.environment import search, ModelMeta
+from BadChess.model import RNNGAN
+from BadChess.environment import search, Config
 
 
 def convert_and_save_model(model, path: Path) -> None:
@@ -46,10 +46,10 @@ def load_model(model_path: Path):
 def run_game(args) -> None:
     """Play a game against the model specified in `args.model_path`"""
     interpreter, (inp, out) = load_model(args.model)
-    ModelMeta.set_chunksize(3)
-    ModelMeta.set_interpreter(interpreter)
-    ModelMeta.set_input(inp)
-    ModelMeta.set_output(out)
+    Config.set_chunksize(3)
+    Config.set_interpreter(interpreter)
+    Config.set_input(inp)
+    Config.set_output(out)
 
     # Setup some stuff
     board = chess.Board(args.start)
@@ -58,8 +58,8 @@ def run_game(args) -> None:
         if board.turn == chess.WHITE:
             bestMove, withEval = search(board, args.engine_depth, True, -inf, inf, ())
             print(bestMove)
-            print(f"Automated move: {bestMove} (evaluated at {withEval}) (searched {ModelMeta.num} positions).")
-            ModelMeta.reset_score()
+            print(f"Automated move: {bestMove} (evaluated at {withEval}) (searched {Config.num} positions).")
+            Config.reset_score()
 
             board.push(bestMove)
             print(board)

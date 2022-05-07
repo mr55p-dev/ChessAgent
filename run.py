@@ -1,5 +1,5 @@
 from typing import List
-from BadChess.modelclass import ConcreteGAN, RNNGAN
+from BadChess.model import ConcreteGAN, RNNGAN
 from BadChess.generator import create_tfdata_set
 
 n_items = 20_000

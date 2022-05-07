@@ -14,7 +14,7 @@ For a position
 - Follow the best choice
 - Recurse to depth d
 """
-class ModelMeta:
+class Config:
     num = 0
     chunksize = None
     interpreter = None
@@ -52,24 +52,24 @@ def search(board: chess.Board, depth: int, max_or_min: bool, alpha: int, beta: i
     """Basic implementation of alpha-beta pruning to search and find the best move in a given position"""
 
     # Create and cache the current bitboard state if we are at a low depth
-    if depth < ModelMeta.chunksize:
+    if depth < Config.chunksize:
         bitboard = bitboard_from_fen(board.fen())
         bitboard_stack = (*bitboard_stack, bitboard)
 
     if depth  == 0:
         # Add a new increment to the number of models searched
-        ModelMeta.num += 1
+        Config.num += 1
 
-        if len(bitboard_stack) < ModelMeta.chunksize - 1:
+        if len(bitboard_stack) < Config.chunksize - 1:
             # If the stack doesnt have enough cache, repeat the current element a couple times
-            bitboard_stack = bitboard_stack + [bitboard_stack[-1]] * (ModelMeta.chunksize - 1)
-            bitboard_stack = bitboard_stack[:ModelMeta.chunksize-1]
+            bitboard_stack = bitboard_stack + [bitboard_stack[-1]] * (Config.chunksize - 1)
+            bitboard_stack = bitboard_stack[:Config.chunksize-1]
 
         # Create a "time series" tensor of inputs of the previous states
         bitboards = tf.stack(bitboard_stack, axis=0)
 
         # Infer the evaluation, and then take the topmost evaluation
-        ev = ModelMeta.infer(bitboards)
+        ev = Config.infer(bitboards)
         ev = tf.squeeze(ev)
         ev = float(ev[-1])
 
@@ -87,7 +87,7 @@ def search(board: chess.Board, depth: int, max_or_min: bool, alpha: int, beta: i
             if newEval > maxEval:
                 maxEval = newEval
                 bestMove = move
-            
+
             alpha = max(alpha, newEval)
             if beta <= alpha:
                 break

@@ -1,4 +1,4 @@
-from BadChess.modelclass import ConcreteGAN
+from BadChess.model import ConcreteGAN
 import tensorflow as tf
 
 

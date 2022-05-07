@@ -5,6 +5,8 @@ Lets answer this!
 ## Build the games
 
 1. Build a local binary of `pgn-extract` using the makefile at `vendor/pgn-extract/src/Makefile`
+2. Install the dependencies
+3. 
 
 ## todos
 

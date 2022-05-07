@@ -1,7 +1,6 @@
 from argparse import ArgumentParser
 from math import inf
 from pathlib import Path
-from chess_gif.gif_maker import Gifmaker
 
 import chess
 import matplotlib.pyplot as plt

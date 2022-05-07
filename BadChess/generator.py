@@ -23,7 +23,7 @@ T_tfdata_output_bitboard = (
 """Create the stream of games at the module level, to ensure that data isnt shared or that the file isn't opened lots of times"""
 # Select the tags (PGN filtering rules) to use
 tagfiles = ["tags_900_1100", "tags_1900_2100"]
-tagfile = tagfiles[1]
+tagfile = tagfiles[0]
 
 # Start reading from the bz2 archive of games
 reader = subprocess.Popen(

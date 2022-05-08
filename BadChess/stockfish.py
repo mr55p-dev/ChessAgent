@@ -23,7 +23,9 @@ class Engine(Popen):
         self._movetime = f" movetime {movetime}" if movetime else ""
         self._maxdepth = f" depth {max_depth}" if max_depth else ""
 
+        # Initialize this object with opening the stockfish process
         super().__init__(["stockfish"], stdin=PIPE, stdout=PIPE)
+        
         # Set up the engine a bit
         self.stdin.write(b"uci\n")
         self.stdin.write(bytes(f"setoption name Skill Level value {skill_level}\n", encoding="utf-8"))

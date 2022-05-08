@@ -12,7 +12,7 @@ from BadChess.model import RNNGAN
 from BadChess.stockfish import Stockfish
 
 """
-Script with argparse-based utilities for:
+Glue module with argparse utils for:
 - Training a model and saving to a .tflite file
 - Loading and playing against a model
 """
@@ -50,8 +50,8 @@ def run_train(args):
             plt.title(key)
             plt.savefig(f'modelgraphs-{key}.png')
             plt.clf()
-
-    convert_and_save_model(model, args.output or Path("./models/generator_test_model.tflite"))
+    path = args.output or "./models/generator_test_model.tflite"
+    convert_and_save_model(model, Path(path))
 
 def load_model(model_path: Path):
     """Load a tflite model and do all the associated initializations"""
@@ -63,6 +63,7 @@ def load_model(model_path: Path):
     return interpreter, (input_tensor_idx, output_tensor_idx)
 
 def play_vs_bot(args):
+    """Play at the command line against the bot"""
     interpreter, (inp, out) = load_model(args.model)
     Config.set_chunksize(args.chunk_size)
     Config.set_interpreter(interpreter)

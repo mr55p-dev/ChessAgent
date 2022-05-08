@@ -19,10 +19,12 @@ def tourney(match_args, n_games):
 
 def grid_search(n_games: int = 5):
     # Engine parameters
-    engine_depths = ['1']
-    whitemodels = ["./models/generator_test_model.tflite"]
-    blackmodels = ["./models/generator_test_model.tflite"]
+    engine_depths = ['4']
+    # These models need to be switched
+    whitemodels = ["./models/generator_upper.tflite", "./models/generator_lower.tflite"]
+    blackmodels = ["./models/generator_lower.tflite", "./models/generator_upper.tflite"]
     param = ["playself"]
+    chunks = ['4']
     results = []
 
     # Get all the combinations
@@ -30,8 +32,12 @@ def grid_search(n_games: int = 5):
         param,
         whitemodels,
         blackmodels,
+        ["--chunk_size"], chunks,
         ["--engine_depth"], engine_depths
     )
+
+    # Remove duplicates (if there are any)
+    searches = set(searches)
 
     # Play a tournament for each combination
     for i in searches:
@@ -58,4 +64,4 @@ def grid_search(n_games: int = 5):
     return results
 
 if __name__ == '__main__':
-    gridsearchres = grid_search(20)
+    gridsearchres = grid_search(10)

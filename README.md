@@ -1,6 +1,4 @@
-# What is the most effective way of quantifying human-like actions in chess, and can this informaiton be used to learn human-like agents?
-
-Lets answer this!
+# Is it possible to augment the behaviour of a static chess agent by learning its evaluation function using a Recurrent Neural Network?
 
 ## Project layout
 
@@ -13,7 +11,6 @@ Lets answer this!
 - `stockfish.py` implements a context manager `Stockfish` for the `Engine` class. Engine inherits from `subprocess.Popen` and opens a stockfish local process, also providing some methods for communicating with the engine through UCI commands. The context manager allows using the engine with the `with` keyword.
 
 `badchess.py` is a glue script for training, loading and simulating games against one or more models. `fight_self.py` and `fight_stockfish.py` both implement grid searches which simulate multiple games between agents and output the results. These are pretty slow and arent accessable through the command line in the same way that `badchess.py` is.
-
 
 ## Build the games
 

@@ -75,7 +75,9 @@ def search(board: chess.Board, depth: int, max_or_min: bool, alpha: int, beta: i
         winner = board.outcome().winner
 
         # Setup the best possible score depending on if we are minimizing or maximizing
-        best = inf if max_or_min else -inf
+        # The score cant be infinite, since otherwise that would screw up the best move
+        # selection, so this is just an absurdly large number
+        best = 1e10 if max_or_min else -1e10
 
         # Case of a draw
         if winner is None:

@@ -99,7 +99,7 @@ def run_game_vs_stockfish(args) -> None:
     Config.set_interpreter(interpreter)
     Config.set_input(inp)
     Config.set_output(out)
-    print = lambda x: print(x) if args.verbose else lambda x: None
+    printf = print if args.verbose else lambda *args, **kwargs: None
 
     # Setup some stuff, use the stockfish context manager
     board = chess.Board(args.start)
@@ -109,14 +109,14 @@ def run_game_vs_stockfish(args) -> None:
         max_depth=args.stockfish_max_depth
         ) as stockfish:
         while not board.is_game_over():
-            print(f"Ply {board.ply()} - {'white' if board.turn else 'black'} to move")
+            printf(f"Ply {board.ply()} - {'white' if board.turn else 'black'} to move")
             if board.turn == chess.WHITE:
                 bestMove, withEval = search(board, args.engine_depth, True, -inf, inf, ())
-                print(f"RNN move: {bestMove} (evaluated at {withEval}) (searched {Config.num} positions).")
+                printf(f"RNN move: {bestMove} (evaluated at {withEval}) (searched {Config.num} positions).")
                 Config.reset_score()
 
                 board.push(bestMove)
-                print(board)
+                printf(board)
             else:
                 # Set the board state for the engine and get the move
                 stockfish.set_state([i.uci() for i in board.move_stack])
@@ -125,8 +125,8 @@ def run_game_vs_stockfish(args) -> None:
                 # Push the move to the board
                 bestMove = chess.Move.from_uci(move)
                 board.push(bestMove)
-                print(f"Stockfish move: {bestMove}.")
-                print(board)
+                printf(f"Stockfish move: {bestMove}.")
+                printf(board)
 
     # Check the board outcome
     out = board.outcome()

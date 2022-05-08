@@ -29,6 +29,7 @@ def convert_and_save_model(model, path: Path) -> None:
     tflite_model = converter.convert()
     with open(path, "wb") as f:
         f.write(tflite_model)
+    print(f"Written {path}")
 
 def run_train(args):
     """Run model training"""
@@ -50,7 +51,7 @@ def run_train(args):
             plt.savefig(f'modelgraphs-{key}.png')
             plt.clf()
 
-    convert_and_save_model(model, Path("./models/generator_test_model.tflite"))
+    convert_and_save_model(model, args.output or Path("./models/generator_test_model.tflite"))
 
 def load_model(model_path: Path):
     """Load a tflite model and do all the associated initializations"""

@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from math import inf
 from pathlib import Path
 from readline import add_history
 from typing import Iterable, List, Tuple

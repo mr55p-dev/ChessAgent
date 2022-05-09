@@ -64,4 +64,4 @@ def grid_search(n_games: int = 5):
     return results
 
 if __name__ == '__main__':
-    gridsearchres = grid_search(10)
+    gridsearchres = grid_search(5)

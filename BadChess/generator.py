@@ -87,6 +87,7 @@ def process_game(game: str) -> T_match_row:
 
 def bitboard_from_fen(fen_string: str) -> tf.Tensor:
     """
+    From https://github.com/mpags-python/coursework2021-sub3-mr55p-dev/blob/main/Chess/helpers.py
     Function to decode a FEN string in to a (8, 8, 12) numpy bitboard array
     Bitboards are set up as following:
 

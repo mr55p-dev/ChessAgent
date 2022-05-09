@@ -20,13 +20,15 @@ def tourney(match_args, n_games):
 
 def grid_search(n_games: int = 5):
     # Stockfish parameters
-    stockfish_levels = ['1', '2', '3', '4', '5']
-    stockfish_depths = ['4']
-    stockfish_times = ['500', '1500']
+    stockfish_levels = ['1', '3', '5']
+    stockfish_times = ['1500']
 
     # Engine parameters
     engine_depths = ['4']
-    models = ["./models/generator_upper.tflite", "./models/generator_lower.tflite"]
+    models = [
+        "./models/generator_lower_flat.tflite",
+        "./models/generator_upper_flat.tflite",
+        ]
     param = ["play"]
     chunk = ['4']
     results = []
@@ -38,7 +40,6 @@ def grid_search(n_games: int = 5):
         ["--engine_depth"], engine_depths,
         ["--chunk_size"], chunk,
         ["--stockfish_skill"], stockfish_levels,
-        ["--stockfish_max_depth"], stockfish_depths,
         ["--stockfish_max_time"], stockfish_times
     )
 
@@ -67,4 +68,4 @@ def grid_search(n_games: int = 5):
     return results
 
 if __name__ == '__main__':
-    gridsearchres = grid_search(20)
+    gridsearchres = grid_search(5)

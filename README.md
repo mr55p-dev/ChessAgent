@@ -19,6 +19,8 @@
 3. Ensure the `bzcat` utility is available.
 4. Download the data file, available [here](https://database.lichess.org). The file used in this training is from April 2018.
 
+The model used for training is specified in `badchess.py`
+
 ## Todos
 
 - [x] Clip and normalize the evaluations to some reasonable number

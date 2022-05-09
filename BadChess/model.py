@@ -309,3 +309,56 @@ class RNNGAN(BaseGAN):
         real_loss = bce(tf.ones_like(real_guess), real_guess)
         fake_loss = bce(tf.zeros_like(fake_guess), fake_guess)
         return tf.add(real_loss, fake_loss)
+
+class FlatRNNGAN(BaseGAN):
+    @staticmethod
+    def create_generator() -> T_model:
+
+        wrap_td = lambda x: keras.layers.TimeDistributed(x)
+
+        i = keras.Input(shape=(4, 8, 8, 12), dtype=tf.float32)
+        l = wrap_td(keras.layers.Flatten())(i)
+
+        l = wrap_td(keras.layers.Dense(512, dtype=tf.float32))(l)
+        l = wrap_td(keras.layers.Activation('relu'))(l)
+
+        l = keras.layers.SimpleRNN(256, activation='relu', return_sequences=True)(l)
+        l = keras.layers.SimpleRNN(128, activation='relu', return_sequences=True)(l)
+
+        l = wrap_td(keras.layers.Dense(128, dtype=tf.float32))(l)
+        l = wrap_td(keras.layers.Activation('relu'))(l)
+        l = wrap_td(keras.layers.Dense(32, dtype=tf.float32))(l)
+        l = wrap_td(keras.layers.Activation('relu'))(l)
+
+        o = wrap_td(keras.layers.Dense(1, dtype=tf.float32))(l)
+
+        return keras.models.Model(inputs=i, outputs=o)
+
+    @staticmethod
+    def create_discriminator() -> T_model:
+        i = keras.Input(shape=(4, 1), dtype=tf.float32)
+        l = keras.layers.SimpleRNN(128, activation='relu')(i)
+
+        l = keras.layers.Dense(128, dtype=tf.float32)(l)
+        l = keras.layers.Activation('relu')(l)
+
+        l = keras.layers.Dense(64, dtype=tf.float32)(l)
+        l = keras.layers.Activation('relu')(l)
+
+        l = keras.layers.Dense(16, dtype=tf.float32)(l)
+        l = keras.layers.Activation('relu')(l)
+
+        o = keras.layers.Dense(1, dtype=tf.float32)(l)
+
+        return keras.models.Model(inputs=i, outputs=o, name="Discriminator")
+
+    def intrinsic_generator_loss(self, prediction: T_tensor, truth: T_tensor) -> T_tensor:
+        return mse(prediction, truth)
+
+    def extrinsic_generator_loss(self, discriminator_output: T_tensor) -> T_tensor:
+        return bce(tf.zeros_like(discriminator_output), discriminator_output)
+
+    def discriminator_loss(self, real_guess: T_tensor, fake_guess: T_tensor) -> T_tensor:
+        real_loss = bce(tf.ones_like(real_guess), real_guess)
+        fake_loss = bce(tf.zeros_like(fake_guess), fake_guess)
+        return tf.add(real_loss, fake_loss)

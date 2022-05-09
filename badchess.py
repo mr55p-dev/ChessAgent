@@ -8,7 +8,8 @@ import tensorflow as tf
 
 from BadChess.environment import Config, search
 from BadChess.generator import create_tfdata_set
-from BadChess.model import RNNGAN
+from BadChess.img_utils import gif_from_board
+from BadChess.model import RNNGAN, FlatRNNGAN
 from BadChess.stockfish import Stockfish
 
 """
@@ -36,7 +37,12 @@ def run_train(args):
     gen_ds = create_tfdata_set(n_items=args.num_train, batch_size=args.batch, chunk_size=args.chunk_size, use_bitboard=True)
     dis_ds = create_tfdata_set(n_items=args.num_train, batch_size=args.batch, chunk_size=args.chunk_size, use_bitboard=False)
 
-    model = RNNGAN()
+    models = {
+        "model1": RNNGAN,
+        "model2": FlatRNNGAN
+    }
+
+    model = models[args.model]()
     logs = model.train(
         args.epochs,
         gen_ds,
@@ -91,6 +97,8 @@ def play_vs_bot(args):
             except ValueError:
                 print("Bad move")
                 continue
+    if args.output:
+        gif_from_board(board, args.output)
 
 def run_game_vs_stockfish(args) -> None:
     """Play a game against the model specified in `args.model_path`"""
@@ -128,6 +136,10 @@ def run_game_vs_stockfish(args) -> None:
                 printf(f"Stockfish move: {bestMove}.")
                 printf(board)
 
+    # Optionally save the game
+    if args.output:
+        gif_from_board(board, args.output)
+
     # Check the board outcome
     out = board.outcome()
     return out.winner, out.termination, board.ply()
@@ -137,12 +149,12 @@ def run_game_vs_self(args) -> None:
     w_interpreter, (w_inp, w_out) = load_model(args.white_model)
     b_interpreter, (b_inp, b_out) = load_model(args.black_model)
     Config.set_chunksize(args.chunk_size)
-    print = lambda x: print(x) if args.verbose else lambda x: None
+    printf = print if args.verbose else lambda x: None
 
     # Setup some stuff, use the stockfish context manager
     board = chess.Board(args.start)
     while not board.is_game_over():
-        print(f"Ply {board.ply()} - {'white' if board.turn else 'black'} to move")
+        printf(f"Ply {board.ply()} - {'white' if board.turn else 'black'} to move")
         if board.turn == chess.WHITE:
             # Need to change the model that the search engine uses for each step...
             Config.set_interpreter(w_interpreter)
@@ -156,11 +168,11 @@ def run_game_vs_self(args) -> None:
 
         # Evaluate and make the move
         bestMove, withEval = search(board, args.engine_depth, True, -inf, inf, ())
-        print(f"RNN move: {bestMove} (evaluated at {withEval}) (searched {Config.num} positions).")
+        printf(f"RNN move: {bestMove} (evaluated at {withEval}) (searched {Config.num} positions).")
         Config.reset_score()
 
         board.push(bestMove)
-        print(board)
+        printf(board)
 
     # Check the board outcome
     out = board.outcome()
@@ -172,11 +184,12 @@ subparsers = parser.add_subparsers()
 
 # Train a model
 training = subparsers.add_parser("train")
+training.add_argument("-m", "--model", help="Which model to train (model1 | model2)", type=str, default="model1")
 training.add_argument("-e", "--epochs", help="Number of epochs to train for.", type=int, default=1)
 training.add_argument("-b", "--batch", help="Batch size.", type=int, default=128)
 training.add_argument("-n", "--num_train", help="Number of examples to train on.", type=int, default=10_000)
 training.add_argument("-o", "--output", help="Output path to write a .tflite file to.", type=str, default="generator_model.tflite")
-training.add_argument("-c", "--chunk_size", help="Number of elements to use in prediction learning", type=int, default=3)
+training.add_argument("-c", "--chunk_size", help="Number of elements to use in prediction learning", type=int, default=4)
 training.add_argument("--graphs", help="Use graphs?", default=False, action="store_true", dest="graph")
 training.set_defaults(func=run_train)
 
@@ -184,7 +197,8 @@ training.set_defaults(func=run_train)
 vs = subparsers.add_parser("vs")
 vs.add_argument("model", help="Path to the model file")
 vs.add_argument("-d", "--engine_depth", help="Search depth for the engine moves.", type=int, default=4)
-vs.add_argument("-c", "--chunk_size", help="Number of elements to use in prediction learning", type=int, default=3)
+vs.add_argument("-c", "--chunk_size", help="Number of elements to use in prediction learning", type=int, default=4)
+vs.add_argument("-o", "--output", help="Output the game to a png file at the path", default=None, type=str)
 vs.set_defaults(func=play_vs_bot)
 
 # Put two models against one andother
@@ -194,7 +208,7 @@ game_self.add_argument("black_model", help="Path to the black model file")
 game_self.add_argument("-d", "--engine_depth", help="Search depth for the engine moves.", type=int, default=4)
 game_self.add_argument("-s", "--start", help="Starting position", type=str, default=chess.STARTING_FEN)
 game_self.add_argument("--verbose", help="How many messages to print", default=False, action="store_true")
-game_self.add_argument("-c", "--chunk_size", help="Number of elements to use in prediction learning", type=int, default=3)
+game_self.add_argument("-c", "--chunk_size", help="Number of elements to use in prediction learning", type=int, default=4)
 game_self.set_defaults(func=run_game_vs_self)
 
 # Put a model against stockfish
@@ -202,11 +216,12 @@ game = subparsers.add_parser("play")
 game.add_argument("model", help="Path to the model file")
 game.add_argument("-d", "--engine_depth", help="Search depth for the engine moves.", type=int, default=4)
 game.add_argument("-s", "--start", help="Starting position", type=str, default=chess.STARTING_FEN)
-game.add_argument("-c", "--chunk_size", help="Number of elements to use in prediction learning", type=int, default=3)
+game.add_argument("-c", "--chunk_size", help="Number of elements to use in prediction learning", type=int, default=4)
 game.add_argument("--stockfish_skill", help="Stockfish skill level prop (1-20)", type=int, default=20)
 game.add_argument("--stockfish_max_depth", help="Stockfish max depth", type=int, default=10)
 game.add_argument("--stockfish_max_time", help="Stockfish maximum thinking time (in ms)", type=int, default=2000)
 game.add_argument("--verbose", help="How many messages to print", default=False, action="store_true")
+game.add_argument("-o", "--output", help="Output the game to a png file at the path", default=None, type=str)
 game.set_defaults(func=run_game_vs_stockfish)
 
 # If we are calling this file directly, parse the args called

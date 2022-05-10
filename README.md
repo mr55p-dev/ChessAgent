@@ -1,5 +1,7 @@
 # Is it possible to augment the behaviour of a static chess agent by learning its evaluation function using a Recurrent Neural Network?
 
+## ATTENTION - ensure to clone this repository with the --recursive flag.
+
 ## Project layout
 The `games` directory contains `gif` animations of some games played between againts or against myself. The white player is named fist.
 

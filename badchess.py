@@ -174,6 +174,10 @@ def run_game_vs_self(args) -> None:
         board.push(bestMove)
         printf(board)
 
+    # Optionally save the game
+    if args.output:
+        gif_from_board(board, args.output)
+
     # Check the board outcome
     out = board.outcome()
     return out.winner, out.termination, board.ply()
@@ -209,6 +213,7 @@ game_self.add_argument("-d", "--engine_depth", help="Search depth for the engine
 game_self.add_argument("-s", "--start", help="Starting position", type=str, default=chess.STARTING_FEN)
 game_self.add_argument("--verbose", help="How many messages to print", default=False, action="store_true")
 game_self.add_argument("-c", "--chunk_size", help="Number of elements to use in prediction learning", type=int, default=4)
+game_self.add_argument("-o", "--output", help="Output the game to a png file at the path", default=None, type=str)
 game_self.set_defaults(func=run_game_vs_self)
 
 # Put a model against stockfish

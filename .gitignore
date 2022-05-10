@@ -170,5 +170,3 @@ cython_debug/
 report/
 
 *.png
-models/*
-*.gif

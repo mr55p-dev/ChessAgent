@@ -1,0 +1,5 @@
+tensorflow==2.5.0
+tqdm
+numpy
+chess==1.9.0
+chess-gif==0.0.9

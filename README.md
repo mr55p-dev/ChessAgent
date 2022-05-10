@@ -1,6 +1,7 @@
 # Is it possible to augment the behaviour of a static chess agent by learning its evaluation function using a Recurrent Neural Network?
 
 ## Project layout
+The `games` directory contains `gif` animations of some games played between againts or against myself. The white player is named fist.
 
 `BadChess` is a python module containing a few different submodules:
 - `environment.py` contains the alpha-beta search algorithm and the `Config` class which provides an interface for setting a tflite intrepreter for the search algorithm to use, via classmethods
@@ -15,9 +16,11 @@
 ## Build the games
 
 1. Build a local binary of `pgn-extract` using the makefile at `vendor/pgn-extract/src/Makefile`
-2. Install the stockfish command line tool, and ensure it is accessable in your `$PATH` and can be called by python.
+2. Install the stockfish command line tool (v15), and ensure it is accessable in your `$PATH` and can be called by python.
 3. Ensure the `bzcat` utility is available.
-4. Download the data file, available [here](https://database.lichess.org). The file used in this training is from April 2018.
+4. Download the data file, available [here](https://database.lichess.org). The file used in this training is from April 2018. Place it in the data directory and ensure the path specified in `generator.py` points to the proper name.
+5. Ensure the `requirements.txt` are satisfied
+6. Run `python3 badchess.py --help` for a list of commands.
 
 The model used for training is specified in `badchess.py`
 

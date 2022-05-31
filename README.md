@@ -30,3 +30,4 @@ The model used for training is specified in `badchess.py`
 
 - [x] Clip and normalize the evaluations to some reasonable number
 - [x] Implement RNN stuff
+****

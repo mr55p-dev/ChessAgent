@@ -213,48 +213,11 @@ class BaseGAN():
     def save_generator(self, path: Path) -> None:
         self.generator.save(str(path))
 
-class ConcreteGAN(BaseGAN):
-    @staticmethod
-    def create_generator() -> T_model:
-        i = keras.Input(shape=(8, 8, 12), dtype=tf.float32)
-        l = keras.layers.Conv2D(24, (3, 3), padding="same")(i)
-        l = keras.layers.Activation('relu')(l)
-        l = keras.layers.Conv2D(36, (3, 3), padding="same")(l)
-        l = keras.layers.Activation('relu')(l)
-        l = keras.layers.Conv2D(48, (3, 3), padding="same")(l)
-        l = keras.layers.Activation('relu')(l)
-        l = keras.layers.MaxPool2D((2, 2))(l)
-        l = keras.layers.Conv2D(64, (3, 3), padding="same")(l)
-        l = keras.layers.Activation('relu')(l)
-        l = keras.layers.Conv2D(64, (3, 3), padding="same")(l)
-        l = keras.layers.Activation('relu')(l)
-        l = keras.layers.Flatten()(l)
-        l = keras.layers.Dense(128)(l)
-        l = keras.layers.Dense(32)(l)
-        o = keras.layers.Dense(1, dtype=tf.float32)(l)
-
-        return keras.models.Model(inputs=i, outputs=o)
-
-    @staticmethod
-    def create_discriminator() -> T_model:
-        i = keras.Input(shape=(1,), dtype=tf.float32)
-        l = keras.layers.Dense(100)(i)
-        l = keras.layers.Dense(100)(l)
-        o = keras.layers.Dense(1, dtype=tf.float32)(l)
-        return keras.models.Model(inputs=i, outputs=o, name="Discriminator")
-
-    def intrinsic_generator_loss(self, prediction: T_tensor, truth: T_tensor) -> T_tensor:
-        return mse(prediction, truth)
-
-    def extrinsic_generator_loss(self, discriminator_output: T_tensor) -> T_tensor:
-        return bce(tf.zeros_like(discriminator_output), discriminator_output)
-
-    def discriminator_loss(self, real_guess: T_tensor, fake_guess: T_tensor) -> T_tensor:
-        real_loss = bce(tf.ones_like(real_guess), real_guess)
-        fake_loss = bce(tf.zeros_like(fake_guess), fake_guess)
-        return tf.add(real_loss, fake_loss)
-
 class RNNGAN(BaseGAN):
+    """
+    RNN based GAN formulation, with convolutional layers to parse the Chess bitboard.
+    Uses a simple RNN for the discriminator
+    """
     @staticmethod
     def create_generator() -> T_model:
 
@@ -303,7 +266,7 @@ class RNNGAN(BaseGAN):
         return mse(prediction, truth)
 
     def extrinsic_generator_loss(self, discriminator_output: T_tensor) -> T_tensor:
-        return bce(tf.zeros_like(discriminator_output), discriminator_output)
+        return bce(tf.ones_like(discriminator_output), discriminator_output)
 
     def discriminator_loss(self, real_guess: T_tensor, fake_guess: T_tensor) -> T_tensor:
         real_loss = bce(tf.ones_like(real_guess), real_guess)
@@ -311,6 +274,10 @@ class RNNGAN(BaseGAN):
         return tf.add(real_loss, fake_loss)
 
 class FlatRNNGAN(BaseGAN):
+    """
+    RNN based GAN formulation, which parses a flattened vector representation of the bitboard.
+    Uses a simple RNN for the discriminator
+    """
     @staticmethod
     def create_generator() -> T_model:
 
@@ -356,7 +323,7 @@ class FlatRNNGAN(BaseGAN):
         return mse(prediction, truth)
 
     def extrinsic_generator_loss(self, discriminator_output: T_tensor) -> T_tensor:
-        return bce(tf.zeros_like(discriminator_output), discriminator_output)
+        return bce(tf.ones_like(discriminator_output), discriminator_output)
 
     def discriminator_loss(self, real_guess: T_tensor, fake_guess: T_tensor) -> T_tensor:
         real_loss = bce(tf.ones_like(real_guess), real_guess)
